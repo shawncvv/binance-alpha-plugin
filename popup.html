@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Alpha Trading Tool</title>
+    <style>
+        :root {
+            --primary: #5b21b6;
+            --primary-hover: #4c1d95;
+            --primary-light: #ede9fe;
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --success: #059669;
+            --success-light: #d1fae5;
+            --danger: #dc2626;
+            --danger-light: #fee2e2;
+            --warning: #d97706;
+            --warning-light: #fef3c7;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --bg-card: #ffffff;
+            --text-primary: #111827;
+            --text-secondary: #6b7280;
+            --text-tertiary: #9ca3af;
+            --border: #e5e7eb;
+            --border-light: #f3f4f6;
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --radius: 16px;
+            --radius-sm: 12px;
+            --radius-xs: 8px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --primary: #8b5cf6;
+                --primary-hover: #7c3aed;
+                --primary-light: #4c1d95;
+                --bg-primary: #111827;
+                --bg-secondary: #1f2937;
+                --bg-tertiary: #374151;
+                --bg-card: #1f2937;
+                --text-primary: #f9fafb;
+                --text-secondary: #d1d5db;
+                --text-tertiary: #9ca3af;
+                --border: #374151;
+                --border-light: #4b5563;
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            width: 380px;
+            max-width: 100%;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+        }
+
+        .container {
+            padding: 0;
+            min-height: 100vh;
+            background: var(--bg-primary);
+        }
+
+        .header {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 24px 20px 28px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            margin: 0 0 8px;
+            letter-spacing: -0.5px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+            margin: 0;
+            font-weight: 400;
+            position: relative;
+            z-index: 1;
+        }
+
+        .main-content {
+            padding: 24px 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .form-field {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .input-wrapper {
+            position: relative;
+            border-radius: var(--radius-xs);
+            overflow: hidden;
+        }
+
+        .input-prefix {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-tertiary);
+            font-size: 15px;
+            font-weight: 600;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        input {
+            width: 100%;
+            padding: 14px 16px;
+            padding-left: 38px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-xs);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            font-size: 15px;
+            font-weight: 600;
+            transition: var(--transition);
+            outline: none;
+            box-shadow: var(--shadow-sm);
+        }
+
+        input:hover {
+            border-color: var(--border-light);
+            box-shadow: var(--shadow);
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 1px rgba(91, 33, 182, 0.1), var(--shadow);
+            transform: translateY(-1px);
+        }
+
+        input::placeholder {
+            color: var(--text-tertiary);
+            font-weight: 500;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 12px;
+            margin: 28px 0 24px;
+        }
+
+        button {
+            border: none;
+            border-radius: var(--radius-xs);
+            padding: 16px 24px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            text-transform: none;
+            letter-spacing: 0.3px;
+        }
+
+        button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        button:active::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        #alphaBtn {
+            background: var(--primary-gradient);
+            color: white;
+            box-shadow: var(--shadow);
+        }
+
+        #alphaBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        #alphaBtn:active {
+            transform: translateY(-1px);
+        }
+
+        .secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .secondary:hover {
+            background: var(--border);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+
+        .status-section {
+            background: var(--bg-card);
+            border-radius: var(--radius-sm);
+            padding: 20px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border);
+        }
+
+        .status-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .status-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--text-tertiary);
+            animation: pulse 2s infinite;
+            position: relative;
+        }
+
+        .status-indicator::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border-radius: 50%;
+            background: inherit;
+            opacity: 0.3;
+            animation: ping 2s infinite;
+        }
+
+        .status-indicator.success {
+            background: var(--success);
+        }
+
+        .status-indicator.error {
+            background: var(--danger);
+        }
+
+        .status-indicator.warning {
+            background: var(--warning);
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        @keyframes ping {
+            0% {
+                transform: scale(1);
+                opacity: 0.3;
+            }
+
+            75%,
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        .output {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-xs);
+            padding: 16px;
+            min-height: 100px;
+            max-height: 200px;
+            overflow-y: auto;
+            font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .output:empty::before {
+            content: "等待操作...";
+            color: var(--text-tertiary);
+            font-style: italic;
+        }
+
+        .settings-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 20px;
+            padding: 12px;
+            color: var(--text-tertiary);
+            font-size: 13px;
+            cursor: pointer;
+            transition: var(--transition);
+            border-radius: var(--radius-xs);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+        }
+
+        .settings-toggle:hover {
+            color: var(--text-secondary);
+            background: var(--bg-tertiary);
+            transform: translateY(-1px);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .form-row {
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .button-group {
+            grid-template-columns: 1fr;
+            gap: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Alpha Trading Tool</h1>
+            <div class="subtitle">自动化交易助手</div>
+        </div>
+
+        <div class="main-content">
+            <div class="form-group">
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="buyAddMoney">
+                            <span>📈</span> 溢价买入
+                        </label>
+                        <div class="input-wrapper">
+                            <span class="input-prefix">+</span>
+                            <input type="number" id="buyAddMoney" value="0" step="0.01" placeholder="0.00">
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label for="sellAddMoney">
+                            <span>📉</span> 折价卖出
+                        </label>
+                        <div class="input-wrapper">
+                            <span class="input-prefix">-</span>
+                            <input type="number" id="sellAddMoney" value="0" step="0.01" placeholder="0.00">
+                        </div>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-field">
+                        <label for="howMoney">
+                            <span>💰</span> 交易金额
+                        </label>
+                        <div class="input-wrapper">
+                            <span class="input-prefix">$</span>
+                            <input type="number" id="howMoney" value="500" step="10" placeholder="500">
+                        </div>
+                    </div>
+                    <div class="form-field">
+                        <label for="tradeCount">
+                            <span>🔄</span> 交易次数
+                        </label>
+                        <div class="input-wrapper">
+                            <span class="input-prefix">#</span>
+                            <input type="number" id="tradeCount" value="1" min="1" max="100" placeholder="1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button id="alphaBtn">
+                    <span>执行交易</span>
+                </button>
+            </div>
+        </div>
+
+        <script src="popup.js"></script>
+    </div>
+</body>
+
+</html>

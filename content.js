@@ -1,0 +1,312 @@
+﻿// 内容脚本（非模块语法）。依赖 utils.js 先注入，直接使用 $$、$、log、store 等全局函数。
+
+// 可在这里配置你想抓取的列表选择器
+// 同时允许通过 window.__DOM_HELPER_OVERRIDE__ 覆盖
+window.CONFIG = {
+    listItemSelector: "ul li, .list .item, .article-list .article",
+    titleSelector: "a, .title, h2, h3",
+    linkSelector: "a[href]",
+    descSelector: ".desc, .summary, p"
+};
+
+function getConfig() {
+    const ovr = window.__DOM_HELPER_OVERRIDE__ || {};
+    return Object.assign({}, window.CONFIG, ovr);
+}
+
+async function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+//模拟输入
+function typeLikeUser(el, text, { delay = 0 } = {}) {
+    if (!el) throw new Error('element is required');
+    //el?.value = "";
+    el.focus();
+
+    const dispatch = (type, opts = {}) =>
+        el.dispatchEvent(new KeyboardEvent(type, { bubbles: true, cancelable: true, ...opts }));
+
+    const inputEvent = (data, inputType = 'insertText') =>
+        el.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, data, inputType }));
+
+    const changeEvent = () =>
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const setNativeValue = (element, value) => {
+        // 兼容 React 受控组件：调用原生 setter，避免仅改 el.value
+        const proto = Object.getPrototypeOf(element);
+        const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+        desc?.set?.call(element, value);
+    };
+
+    const typeChar = async (ch) => {
+        dispatch('keydown', { key: ch, code: `Key${(ch + '').toUpperCase()}`, keyCode: ch.charCodeAt(0) });
+        // 某些环境还会监听 keypress
+        el.dispatchEvent(new KeyboardEvent('keypress', { bubbles: true, cancelable: true, key: ch }));
+        setNativeValue(el, (el.value ?? '') + ch);
+        inputEvent(ch, 'insertText');
+        dispatch('keyup', { key: ch });
+        if (delay) await new Promise(r => setTimeout(r, delay));
+    };
+
+    const run = async () => {
+        for (const ch of text) {
+            await typeChar(ch);
+        }
+        changeEvent();
+    };
+
+    return run();
+}
+
+//刷alpha
+async function alphaBtnActionButtons(buyAdd, sellAdd, howMoney, tradeCount = 1) {
+    console.log(`开始执行 ${tradeCount} 次交易，每次金额: ${howMoney} USDT`);
+
+    const results = [];
+
+    for (let i = 1; i <= tradeCount; i++) {
+        console.log(`正在执行第 ${i}/${tradeCount} 次交易...`);
+
+        try {
+            const result = await executeSingleTrade(buyAdd, sellAdd, howMoney);
+            results.push({ trade: i, success: true, result: result });
+            console.log(`第 ${i} 次交易成功`);
+
+            // 交易间隔，避免过于频繁
+            if (i < tradeCount) {
+                console.log("等待 2 秒后执行下一次交易...");
+                await sleep(2000);
+            }
+
+        } catch (error) {
+            console.error(`第 ${i} 次交易失败:`, error);
+            results.push({ trade: i, success: false, error: error.message });
+
+            // 如果失败，可以选择继续或停止
+            // 这里选择继续执行剩余交易
+        }
+    }
+
+    console.log(`交易完成！成功: ${results.filter(r => r.success).length}/${tradeCount}`);
+    return results;
+}
+
+// 执行单次交易
+async function executeSingleTrade(buyAdd, sellAdd, howMoney) {
+    var firstPrice = $$(".flex-1.cursor-pointer")[0];
+
+    if (!firstPrice) {
+        throw new Error("无法找到价格元素");
+    }
+
+    //获取价格
+    var fprice = firstPrice.innerHTML;
+    console.log("获取价格：" + fprice);
+    fprice = parseFloat(fprice) + parseFloat(buyAdd);
+    var sellprice = fprice - parseFloat(sellAdd);
+    console.log("买入价格：" + fprice);
+    console.log("卖出价格：" + sellprice);
+
+    //设置买入价格
+    var tempInput = $("#limitPrice");
+    if (!tempInput) {
+        throw new Error("无法找到买入价格输入框");
+    }
+
+    tempInput.value = "";
+    await sleep(100);
+    typeLikeUser(tempInput, fprice.toString(), { delay: 20 });
+    await sleep(300);
+
+    //填入数量
+    var limitTotalElements = $$("#limitTotal");
+    if (limitTotalElements.length < 1) {
+        throw new Error("无法找到交易金额输入框");
+    }
+    typeLikeUser(limitTotalElements[0], howMoney.toString(), { delay: 20 });
+    await sleep(300);
+
+    //设置卖出价格
+    if (limitTotalElements.length < 2) {
+        throw new Error("无法找到卖出价格输入框");
+    }
+    tempInput = limitTotalElements[1];
+    tempInput.value = "";
+    await sleep(100);
+    typeLikeUser(tempInput, sellprice.toString(), { delay: 20 });
+    await sleep(300);
+
+    //点击购买
+    var buyButton = $(".bn-button.bn-button__buy.data-size-middle.w-full");
+    if (!buyButton) {
+        throw new Error("无法找到购买按钮");
+    }
+    buyButton.click();
+
+    //等待确认按钮
+    var qybtn = $(".bn-button.bn-button__primary.data-size-middle.w-full");
+    var i = 0;
+    while (qybtn == undefined || qybtn == null) {
+        i++;
+        if (i > 20) break;
+        await sleep(300);
+        qybtn = $(".bn-button.bn-button__primary.data-size-middle.w-full");
+    }
+    if (i > 20) {
+        throw new Error("没有找到确认按钮");
+    }
+
+    //点击确认
+    qybtn.click();
+
+    // 等待交易完成
+    await sleep(1000);
+
+    return {
+        buyPrice: fprice,
+        sellPrice: sellprice,
+        amount: howMoney,
+        timestamp: new Date().toISOString()
+    };
+}
+
+// 从当前页面抓取列表数据
+async function scrapeListData() {
+
+    var btns = $$(".bn-tab.bn-tab__primary-gray.data-size-small.data-font-4");
+    btns[1].click();
+    await sleep(2000);
+    btns[0].click();
+    await sleep(2000);
+
+    const list = $$(".bn-virtual-table > div > div");
+    list.forEach((item, index) => {
+        // 2.1 在每个 item 内按 class 查找
+       // const titleEl = $(".t-caption1", item);          // 匹配 .title
+        //const valueEl = $(".value", item);          // 匹配 .value
+
+
+        //刷新
+        //bn-tab bn-tab__primary-gray data-size-small data-font-4
+       
+        //console.log(btns[1]);
+
+        
+       // await new Promise(r => setTimeout(r, 1000));
+       
+
+
+        const subdivs = $$(".t-caption1", item);     // 匹配多个 .sub-text
+        var xx = subdivs[3].innerHTML;
+
+        //const titles = $(".mr-[2px] t-caption2 cursor-pointer", item);
+        const titles = $(".t-caption2.cursor-pointer", item);
+        var title = titles.innerHTML;
+        console.log(title + "=>>" + xx);
+        //subdivs.forEach((sdiv, i) => {
+        //    //var slll=$$("div", sdiv);
+
+        //});
+        
+
+
+        
+        //await new Promise(r => setTimeout(r, 1000));
+
+
+        
+
+
+        // 2.2 在每个 item 内按 id 查找（不推荐重复 id 的场景）
+        //const idEl = $("#some-id", item);           // 仅在 item 内找 #some-id
+
+        //// 2.3 在每个 item 内按“第几个”查找（结构固定时使用）
+        //// 方式A：querySelector 的 :nth-child
+        //const thirdChild = $(":scope > div:nth-child(3)", item); // item 的第3个直接子 div
+        //// 方式B：先收集再用数组索引
+        //const childDivs = $$(":scope > div", item);
+        //const first = childDivs[0];
+        //const second = childDivs[1];
+
+        //// 2.4 取文本/属性
+        //const title = (titleEl?.textContent || "").trim();
+        //const value = (valueEl?.textContent || "").trim();
+        //const idText = (idEl?.textContent || "").trim();
+        //const thirdText = (thirdChild?.textContent || "").trim();
+
+        //// 2.5 取链接/图片等属性
+        //const linkHref = $("a", item)?.href || "";
+        //const imgSrc = $("img", item)?.src || "";
+
+        //// 2.6 打包结果
+        //const row = {
+        //    index,
+        //    title,
+        //    value,
+        //    idText,
+        //    thirdText,
+        //    linkHref,
+        //    imgSrc
+        //};
+        //console.log("row", row);
+    });
+    console.log("---------");
+
+
+
+    return;
+
+
+
+    const CONFIG = getConfig();
+    const items = $$(CONFIG.listItemSelector);
+    const rows = items.map(el => {
+        const titleEl = $(CONFIG.titleSelector, el);
+        const linkEl = $(CONFIG.linkSelector, el);
+        const descEl = $(CONFIG.descSelector, el);
+        return {
+            title: toText(titleEl),
+            link: linkEl && linkEl.href || "",
+            desc: toText(descEl),
+            _meta: {
+                timestamp: Date.now(),
+                location: location.href
+            }
+        };
+    }).filter(r => r.title || r.link || r.desc);
+
+    log("Scraped items:", rows.length, rows);
+    await store.set("lastScraped", rows);
+    return rows;
+}
+
+
+
+
+// 供 popup/background 调用的命令执行器
+async function handleCommand(cmd, payload) {
+    switch (cmd) {
+        case "alphaBtn":
+            const { buyAdd, sellAdd, howMoney, tradeCount } = payload || {};
+            return await alphaBtnActionButtons(buyAdd, sellAdd, howMoney, tradeCount);
+        default:
+            return null;
+    }
+}
+
+// 消息监听
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+    if (msg && msg.type === "DOM_HELPER_CMD") {
+        handleCommand(msg.cmd, msg.payload)
+            .then(res => sendResponse({ ok: true, data: res }))
+            .catch(err => sendResponse({ ok: false, error: String(err) }));
+        return true; // 异步响应
+    }
+});
+
+// 初始化
+(function init() {
+    log("content loaded on", location.href);
+    
+})();
