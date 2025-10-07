@@ -60,47 +60,9 @@ function typeLikeUser(el, text, { delay = 0 } = {}) {
 }
 
 //刷alpha
-async function alphaBtnActionButtons(buyAdd, sellAdd, howMoney, tradeCount = 1) {
-    console.log(`开始执行 ${tradeCount} 次交易，每次金额: ${howMoney} USDT`);
-
-    const results = [];
-
-    for (let i = 1; i <= tradeCount; i++) {
-        console.log(`正在执行第 ${i}/${tradeCount} 次交易...`);
-
-        try {
-            const result = await executeSingleTrade(buyAdd, sellAdd, howMoney);
-            results.push({ trade: i, success: true, result: result });
-            console.log(`第 ${i} 次交易成功`);
-
-            // 交易间隔，避免过于频繁
-            if (i < tradeCount) {
-                console.log("等待 2 秒后执行下一次交易...");
-                await sleep(2000);
-            }
-
-        } catch (error) {
-            console.error(`第 ${i} 次交易失败:`, error);
-            results.push({ trade: i, success: false, error: error.message });
-
-            // 如果失败，可以选择继续或停止
-            // 这里选择继续执行剩余交易
-        }
-    }
-
-    console.log(`交易完成！成功: ${results.filter(r => r.success).length}/${tradeCount}`);
-    return results;
-}
-
-// 执行单次交易
-async function executeSingleTrade(buyAdd, sellAdd, howMoney) {
+async function alphaBtnActionButtons(buyAdd, sellAdd, howMoney) {
+    //return;
     var firstPrice = $$(".flex-1.cursor-pointer")[0];
-
-    if (!firstPrice) {
-        throw new Error("无法找到价格元素");
-    }
-
-    //获取价格
     var fprice = firstPrice.innerHTML;
     console.log("获取价格：" + fprice);
     fprice = parseFloat(fprice) + parseFloat(buyAdd);
@@ -110,39 +72,32 @@ async function executeSingleTrade(buyAdd, sellAdd, howMoney) {
 
     //设置买入价格
     var tempInput = $("#limitPrice");
-    if (!tempInput) {
-        throw new Error("无法找到买入价格输入框");
-    }
-
     tempInput.value = "";
     await sleep(100);
-    typeLikeUser(tempInput, fprice.toString(), { delay: 20 });
-    await sleep(300);
+    typeLikeUser(tempInput, fprice.toString(), { delay: 10 });
+    await sleep(200);
 
     //填入数量
-    var limitTotalElements = $$("#limitTotal");
-    if (limitTotalElements.length < 1) {
-        throw new Error("无法找到交易金额输入框");
-    }
-    typeLikeUser(limitTotalElements[0], howMoney.toString(), { delay: 20 });
-    await sleep(300);
+    var numInput = $$("#limitTotal")[0];
+    numInput.value = "";
+    await sleep(100);
+    numInput.click();
+    await sleep(100);
+    typeLikeUser(numInput, howMoney.toString(), { delay: 10 });
+    await sleep(200);
+
 
     //设置卖出价格
-    if (limitTotalElements.length < 2) {
-        throw new Error("无法找到卖出价格输入框");
-    }
-    tempInput = limitTotalElements[1];
+    tempInput = $$("#limitTotal")[1];
     tempInput.value = "";
     await sleep(100);
-    typeLikeUser(tempInput, sellprice.toString(), { delay: 20 });
-    await sleep(300);
+    typeLikeUser(tempInput, sellprice.toString(), { delay: 10 });
+    await sleep(200);
+
+    //return;
 
     //点击购买
-    var buyButton = $(".bn-button.bn-button__buy.data-size-middle.w-full");
-    if (!buyButton) {
-        throw new Error("无法找到购买按钮");
-    }
-    buyButton.click();
+    $(".bn-button.bn-button__buy.data-size-middle.w-full").click();
 
     //等待确认按钮
     var qybtn = $(".bn-button.bn-button__primary.data-size-middle.w-full");
@@ -154,21 +109,14 @@ async function executeSingleTrade(buyAdd, sellAdd, howMoney) {
         qybtn = $(".bn-button.bn-button__primary.data-size-middle.w-full");
     }
     if (i > 20) {
-        throw new Error("没有找到确认按钮");
+        console.log("没有找到确认按钮");
     }
 
     //点击确认
     qybtn.click();
 
-    // 等待交易完成
-    await sleep(1000);
-
-    return {
-        buyPrice: fprice,
-        sellPrice: sellprice,
-        amount: howMoney,
-        timestamp: new Date().toISOString()
-    };
+    //console.log(qybtn);
+    return "";
 }
 
 // 从当前页面抓取列表数据
@@ -183,18 +131,18 @@ async function scrapeListData() {
     const list = $$(".bn-virtual-table > div > div");
     list.forEach((item, index) => {
         // 2.1 在每个 item 内按 class 查找
-       // const titleEl = $(".t-caption1", item);          // 匹配 .title
+        // const titleEl = $(".t-caption1", item);          // 匹配 .title
         //const valueEl = $(".value", item);          // 匹配 .value
 
 
         //刷新
         //bn-tab bn-tab__primary-gray data-size-small data-font-4
-       
-        //console.log(btns[1]);
 
-        
-       // await new Promise(r => setTimeout(r, 1000));
-       
+        console.log(btns[1]);
+
+
+        // await new Promise(r => setTimeout(r, 1000));
+
 
 
         const subdivs = $$(".t-caption1", item);     // 匹配多个 .sub-text
@@ -208,14 +156,14 @@ async function scrapeListData() {
         //    //var slll=$$("div", sdiv);
 
         //});
-        
 
 
-        
+
+
         //await new Promise(r => setTimeout(r, 1000));
 
 
-        
+
 
 
         // 2.2 在每个 item 内按 id 查找（不推荐重复 id 的场景）
@@ -288,8 +236,8 @@ async function scrapeListData() {
 async function handleCommand(cmd, payload) {
     switch (cmd) {
         case "alphaBtn":
-            const { buyAdd, sellAdd, howMoney, tradeCount } = payload || {};
-            return await alphaBtnActionButtons(buyAdd, sellAdd, howMoney, tradeCount);
+            const { buyAdd, sellAdd, howMoney } = payload || {};
+            return await alphaBtnActionButtons(buyAdd, sellAdd, howMoney);
         default:
             return null;
     }
@@ -308,5 +256,5 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 // 初始化
 (function init() {
     log("content loaded on", location.href);
-    
+
 })();

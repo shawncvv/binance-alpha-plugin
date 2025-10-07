@@ -60,7 +60,7 @@
             margin: 0;
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            width: 380px;
+            width: 360px;
             max-width: 100%;
             background: var(--bg-primary);
             color: var(--text-primary);
@@ -70,14 +70,14 @@
 
         .container {
             padding: 0;
-            min-height: 100vh;
+            min-height: 60vh;
             background: var(--bg-primary);
         }
 
         .header {
             background: var(--primary-gradient);
             color: white;
-            padding: 24px 20px 28px;
+            padding: 18px 20px 24px;
             text-align: center;
             position: relative;
             overflow: hidden;
@@ -263,131 +263,19 @@
             box-shadow: none !important;
         }
 
-        .status-section {
-            background: var(--bg-card);
-            border-radius: var(--radius-sm);
-            padding: 20px;
-            box-shadow: var(--shadow-sm);
-            border: 1px solid var(--border);
-        }
-
-        .status-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 12px;
-        }
-
-        .status-title {
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-secondary);
-        }
-
-        .status-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: var(--text-tertiary);
-            animation: pulse 2s infinite;
-            position: relative;
-        }
-
-        .status-indicator::after {
-            content: '';
-            position: absolute;
-            top: -2px;
-            left: -2px;
-            right: -2px;
-            bottom: -2px;
-            border-radius: 50%;
-            background: inherit;
-            opacity: 0.3;
-            animation: ping 2s infinite;
-        }
-
-        .status-indicator.success {
-            background: var(--success);
-        }
-
-        .status-indicator.error {
-            background: var(--danger);
-        }
-
-        .status-indicator.warning {
-            background: var(--warning);
-        }
-
-        @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1;
-            }
-
-            50% {
-                opacity: 0.7;
-            }
-        }
-
-        @keyframes ping {
-            0% {
-                transform: scale(1);
-                opacity: 0.3;
-            }
-
-            75%,
-            100% {
-                transform: scale(1.5);
-                opacity: 0;
-            }
-        }
-
-        .output {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-xs);
-            padding: 16px;
-            min-height: 100px;
-            max-height: 200px;
-            overflow-y: auto;
-            font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
-            font-size: 12px;
-            line-height: 1.5;
-            color: var(--text-secondary);
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-
-        .output:empty::before {
-            content: "等待操作...";
-            color: var(--text-tertiary);
-            font-style: italic;
-        }
-
-        .settings-toggle {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-top: 20px;
-            padding: 12px;
-            color: var(--text-tertiary);
-            font-size: 13px;
-            cursor: pointer;
-            transition: var(--transition);
-            border-radius: var(--radius-xs);
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-        }
-
-        .settings-toggle:hover {
-            color: var(--text-secondary);
-            background: var(--bg-tertiary);
-            transform: translateY(-1px);
-        }
-
         .hidden {
             display: none !important;
+        }
+
+        .warning-notice {
+            text-align: center;
+            margin-top: 12px;
+        }
+
+        .warning-text {
+            color: var(--danger);
+            font-weight: 700;
+            font-size: 14px;
         }
 
         .form-row {
@@ -418,7 +306,7 @@
                         </label>
                         <div class="input-wrapper">
                             <span class="input-prefix">+</span>
-                            <input type="number" id="buyAddMoney" value="0" step="0.01" placeholder="0.00">
+                            <input type="number" id="buyAddMoney" value="0.00001" step="0.00001" placeholder="0.00001">
                         </div>
                     </div>
                     <div class="form-field">
@@ -427,7 +315,7 @@
                         </label>
                         <div class="input-wrapper">
                             <span class="input-prefix">-</span>
-                            <input type="number" id="sellAddMoney" value="0" step="0.01" placeholder="0.00">
+                            <input type="number" id="sellAddMoney" value="0.00003" step="0.00003" placeholder="0.00003">
                         </div>
                     </div>
                 </div>
@@ -438,10 +326,10 @@
                         </label>
                         <div class="input-wrapper">
                             <span class="input-prefix">$</span>
-                            <input type="number" id="howMoney" value="500" step="10" placeholder="500">
+                            <input type="number" id="howMoney" value="50" step="10" placeholder="50">
                         </div>
                     </div>
-                    <div class="form-field">
+                    <!-- <div class="form-field">
                         <label for="tradeCount">
                             <span>🔄</span> 交易次数
                         </label>
@@ -449,7 +337,7 @@
                             <span class="input-prefix">#</span>
                             <input type="number" id="tradeCount" value="1" min="1" max="100" placeholder="1">
                         </div>
-                    </div>
+                    </div> -->
                 </div>
             </div>
 
@@ -458,6 +346,18 @@
                     <span>执行交易</span>
                 </button>
             </div>
+            <div class="warning-notice">
+                <div class="warning-text">❗ 请确保勾选反向订单</div>
+            </div>
+        </div>
+
+        <div class="row" style="display:none">
+            <label>自定义选择器（覆盖 content.js 的 listItemSelector）</label>
+            <input id="listSelector" placeholder="例如：.article-list .article" />
+        </div>
+
+        <div class="row" style="display:none">
+            <button id="applySelector" class="secondary">应用选择器</button>
         </div>
 
         <script src="popup.js"></script>
