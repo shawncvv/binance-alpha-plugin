@@ -59,9 +59,8 @@ function typeLikeUser(el, text, { delay = 0 } = {}) {
     return run();
 }
 
-//刷alpha
+//刷alpha - 单次交易
 async function alphaBtnActionButtons(buyAdd, sellAdd, howMoney) {
-    //return;
     var firstPrice = $$(".flex-1.cursor-pointer")[0];
     var fprice = firstPrice.innerHTML;
     console.log("获取价格：" + fprice);
@@ -86,15 +85,12 @@ async function alphaBtnActionButtons(buyAdd, sellAdd, howMoney) {
     typeLikeUser(numInput, howMoney.toString(), { delay: 10 });
     await sleep(200);
 
-
     //设置卖出价格
     tempInput = $$("#limitTotal")[1];
     tempInput.value = "";
     await sleep(100);
     typeLikeUser(tempInput, sellprice.toString(), { delay: 10 });
     await sleep(200);
-
-    //return;
 
     //点击购买
     $(".bn-button.bn-button__buy.data-size-middle.w-full").click();
@@ -115,7 +111,62 @@ async function alphaBtnActionButtons(buyAdd, sellAdd, howMoney) {
     //点击确认
     qybtn.click();
 
-    //console.log(qybtn);
+    return "";
+}
+
+// 全局交易状态
+window.isTradingPaused = false;
+window.currentTradeSession = null;
+
+//多次交易执行函数
+async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, tradeInterval) {
+    tradeCount = parseInt(tradeCount) || 1;
+    tradeInterval = parseInt(tradeInterval) || 5;
+
+    console.log(`开始执行 ${tradeCount} 次交易，间隔 ${tradeInterval} 秒`);
+
+    // 创建新的交易会话ID
+    const sessionId = Date.now();
+    window.currentTradeSession = sessionId;
+
+    for (let i = 1; i <= tradeCount; i++) {
+        // 检查是否被暂停或会话已更改
+        if (window.isTradingPaused || window.currentTradeSession !== sessionId) {
+            console.log('交易已被暂停或停止');
+            return "交易已暂停";
+        }
+
+        console.log(`执行第 ${i}/${tradeCount} 次交易`);
+
+        try {
+            await alphaBtnActionButtons(buyAdd, sellAdd, howMoney);
+            console.log(`第 ${i} 次交易完成`);
+
+            // 如果不是最后一次交易，等待间隔时间
+            if (i < tradeCount) {
+                console.log(`等待 ${tradeInterval} 秒后执行下次交易...`);
+
+                // 在等待期间检查暂停状态
+                for (let waitTime = 0; waitTime < tradeInterval; waitTime++) {
+                    if (window.isTradingPaused || window.currentTradeSession !== sessionId) {
+                        console.log('等待期间交易被暂停');
+                        return "交易已暂停";
+                    }
+                    await sleep(1000); // 每秒检查一次暂停状态
+                }
+            }
+        } catch (error) {
+            console.error(`第 ${i} 次交易失败:`, error);
+            // 即使失败也继续执行下次交易
+            if (i < tradeCount) {
+                await sleep(tradeInterval * 1000);
+            }
+        }
+    }
+
+    console.log(`所有 ${tradeCount} 次交易执行完成`);
+    // 交易完成后重置状态
+    window.currentTradeSession = null;
     return "";
 }
 
@@ -236,8 +287,15 @@ async function scrapeListData() {
 async function handleCommand(cmd, payload) {
     switch (cmd) {
         case "alphaBtn":
-            const { buyAdd, sellAdd, howMoney } = payload || {};
-            return await alphaBtnActionButtons(buyAdd, sellAdd, howMoney);
+            const { buyAdd, sellAdd, howMoney, tradeCount, tradeInterval } = payload || {};
+            // 重置暂停状态，开始新的交易
+            window.isTradingPaused = false;
+            return await executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, tradeInterval);
+        case "stopTrading":
+            window.isTradingPaused = true;
+            window.currentTradeSession = null;
+            console.log('交易已停止');
+            return "交易已停止";
         default:
             return null;
     }
