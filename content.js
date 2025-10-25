@@ -9,6 +9,19 @@ window.CONFIG = {
     descSelector: ".desc, .summary, p"
 };
 
+// 把dom元素收拢在一起
+const SELECTORS = Object.freeze({
+    priceItems: ".flex-1.cursor-pointer",
+    limitPriceInput: "#limitPrice",
+    limitTotalInputs: "#limitTotal",
+    buyButton: ".bn-button.bn-button__buy.data-size-middle.w-full",
+    confirmButton: ".bn-button.bn-button__primary.data-size-middle.w-full",
+    reverseOrderCheckbox: ".bn-checkbox.bn-checkbox__square.data-size-md",
+    allBuyButtons: ".bn-button__buy",
+    // 账户余额显示元素
+    balanceAmount: "div.text-PrimaryText.text-\\[12px\\].leading-\\[18px\\].font-\\[500\\]"
+});
+
 function getConfig() {
     const ovr = window.__DOM_HELPER_OVERRIDE__ || {};
     return Object.assign({}, window.CONFIG, ovr);
@@ -55,61 +68,223 @@ function typeLikeUser(el, text, { delay = 0 } = {}) {
         }
         changeEvent();
     };
-
     return run();
 }
 
+function parseBalanceText(raw) {
+    if (!raw) return null;
+    const numericPart = raw.replace(/[^\d.,\-]/g, "").replace(/,/g, "");
+    if (!numericPart) return null;
+    const value = Number(numericPart);
+    return Number.isFinite(value) ? value : null;
+}
+
+function formatAmount(value, fractionDigits = 8) {
+    if (!Number.isFinite(value)) return "";
+    if (Math.abs(value) < 1e-8) value = 0;
+    const str = Number(value).toFixed(fractionDigits);
+    return str.replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
+}
+
+function readDisplayedBalance() {
+    try {
+        const balanceEl = document.querySelector(SELECTORS.balanceAmount);
+        if (!balanceEl) return null;
+        const text = balanceEl.textContent || balanceEl.innerText || "";
+        return parseBalanceText(text);
+    } catch (err) {
+        return null;
+    }
+}
+
+// 自动勾选反向订单
+function isReverseOrderEnabled() {
+    const checkbox = document.querySelector(SELECTORS.reverseOrderCheckbox);
+    if (!checkbox) return false;
+    const input = checkbox.querySelector("input[type='checkbox']");
+    return checkbox.classList.contains("checked")
+        || checkbox.getAttribute("aria-checked") === "true"
+        || (input && input.checked === true);
+}
+
+// 初始化检测函数，确保页面元素存在，打开插件的时候执行
+
+function runElementDiagnostics() {
+    const currentProgress = ensureTradeProgress();
+    const priceElements = document.querySelectorAll(SELECTORS.priceItems);
+    const limitPrice = document.querySelector(SELECTORS.limitPriceInput);
+    const limitTotals = document.querySelectorAll(SELECTORS.limitTotalInputs);
+    const buyBtn = document.querySelector(SELECTORS.buyButton);
+    const allBuyBtns = document.querySelectorAll(SELECTORS.allBuyButtons);
+    const reverseCheckbox = document.querySelector(SELECTORS.reverseOrderCheckbox);
+    const balanceEl = document.querySelector(SELECTORS.balanceAmount);
+
+    const missingParts = [];
+
+    if (priceElements.length === 0) missingParts.push("价格列表元素");
+    if (!limitPrice) missingParts.push("买入限价输入框");
+    if (limitTotals.length < 2) missingParts.push("数量与卖出输入框");
+    if (!buyBtn) missingParts.push("买入按钮");
+    if (allBuyBtns.length === 0) missingParts.push("买入按钮集合");
+    if (!reverseCheckbox) missingParts.push("反向订单复选框");
+    if (!balanceEl) missingParts.push("账户余额显示");
+
+    if (missingParts.length > 0) {
+        const detail = `缺失元素：${missingParts.join("，")}`;
+        console.warn("元素检测失败：", detail);
+        pushTradeProgress({
+            status: "error",
+            total: 0,
+            current: 0,
+            lastMessage: "初始化失败，页面缺少必要元素。",
+            lastError: detail,
+            balanceBefore: currentProgress?.balanceBefore ?? null,
+            balanceAfter: currentProgress?.balanceAfter ?? null,
+            balanceChange: currentProgress?.balanceChange ?? null
+        });
+        return false;
+    }
+
+    const progressUpdate = { lastError: null };
+
+    const shouldResetState =
+        (!currentProgress.total || currentProgress.total === 0) &&
+        ["idle", "completed", "error", "stopped", undefined, null].includes(currentProgress.status);
+
+    if (shouldResetState) {
+        Object.assign(progressUpdate, {
+            status: "idle",
+            total: 0,
+            current: 0,
+            lastMessage: "初始化成功，已检测到交易页面核心元素。"
+        });
+    } else if (currentProgress.lastMessage === undefined || currentProgress.lastMessage === null) {
+        progressUpdate.lastMessage = "初始化成功，已检测到交易页面核心元素。";
+    }
+
+    pushTradeProgress(progressUpdate);
+    return true;
+}
+
+function createDefaultTradeProgress() {
+    return {
+        total: 0,
+        current: 0,
+        status: "idle",
+        lastMessage: "等待交易开始",
+        lastUpdated: Date.now(),
+        balanceBefore: null,
+        balanceAfter: null,
+        balanceChange: null
+    };
+}
+
+function ensureTradeProgress() {
+    if (!window.tradeProgress) {
+        window.tradeProgress = createDefaultTradeProgress();
+    }
+    return window.tradeProgress;
+}
+
+function pushTradeProgress(partial) {
+    const progress = ensureTradeProgress();
+    Object.assign(progress, partial);
+    progress.lastUpdated = Date.now();
+    const payload = { ...progress };
+    try {
+        chrome.runtime.sendMessage({ type: "TRADE_PROGRESS_UPDATE", data: payload }, () => {
+            if (chrome.runtime.lastError) {
+                // Popup 可能未打开，忽略错误
+            }
+        });
+    } catch (err) {
+        // 某些页面上下文可能暂未注入 runtime，忽略异常
+    }
+    return payload;
+}
+
+function getTradeProgressSnapshot() {
+    return { ...ensureTradeProgress() };
+}
+
+ensureTradeProgress();
+
 //刷alpha - 单次交易
 async function alphaBtnActionButtons(buyAdd, sellAdd, howMoney) {
-    var firstPrice = $$(".flex-1.cursor-pointer")[0];
-    var fprice = firstPrice.innerHTML;
-    console.log("获取价格：" + fprice);
-    fprice = parseFloat(fprice) + parseFloat(buyAdd);
-    var sellprice = fprice - parseFloat(sellAdd);
-    console.log("买入价格：" + fprice);
-    console.log("卖出价格：" + sellprice);
+    const rawPriceOffset = Number(buyAdd || 0);
+    const rawSellOffset = Number(sellAdd || 0);
+    const amount = Number(howMoney || 0);
 
-    //设置买入价格
-    var tempInput = $("#limitPrice");
-    tempInput.value = "";
-    await sleep(100);
-    typeLikeUser(tempInput, fprice.toString(), { delay: 10 });
-    await sleep(200);
-
-    //填入数量
-    var numInput = $$("#limitTotal")[0];
-    numInput.value = "";
-    await sleep(100);
-    numInput.click();
-    await sleep(100);
-    typeLikeUser(numInput, howMoney.toString(), { delay: 10 });
-    await sleep(200);
-
-    //设置卖出价格
-    tempInput = $$("#limitTotal")[1];
-    tempInput.value = "";
-    await sleep(100);
-    typeLikeUser(tempInput, sellprice.toString(), { delay: 10 });
-    await sleep(200);
-
-    //点击购买
-    $(".bn-button.bn-button__buy.data-size-middle.w-full").click();
-
-    //等待确认按钮
-    var qybtn = $(".bn-button.bn-button__primary.data-size-middle.w-full");
-    var i = 0;
-    while (qybtn == undefined || qybtn == null) {
-        i++;
-        if (i > 20) break;
-        await sleep(300);
-        qybtn = $(".bn-button.bn-button__primary.data-size-middle.w-full");
-    }
-    if (i > 20) {
-        console.log("没有找到确认按钮");
+    if (!Number.isFinite(amount) || amount <= 0) {
+        throw new Error("交易金额无效，请检查输入");
     }
 
-    //点击确认
-    qybtn.click();
+    if (!Number.isFinite(rawPriceOffset) || !Number.isFinite(rawSellOffset)) {
+        throw new Error("买入/卖出偏移量无效");
+    }
+
+    const priceElements = $$(SELECTORS.priceItems);
+    const firstPriceEl = priceElements[0];
+    if (!firstPriceEl) {
+        throw new Error("未找到价格元素，无法继续下单");
+    }
+
+    const priceText = (firstPriceEl.textContent || firstPriceEl.innerText || "").replace(/[^\d.\-]/g, "");
+    const basePrice = Number(priceText);
+    if (!Number.isFinite(basePrice)) {
+        throw new Error("价格解析失败，获取到的内容为：" + priceText);
+    }
+
+    const buyPrice = basePrice + rawPriceOffset;
+    const sellPrice = buyPrice - rawSellOffset;
+
+    // 格式化价格，避免浮点精度问题，买入
+    const buyPriceStr = formatAmount(buyPrice, 8);
+    // 卖出价格
+    const sellPriceStr = formatAmount(sellPrice, 8);
+    log(`获取价格：${basePrice}，买入价格：${buyPrice}，卖出价格：${sellPrice}`);
+
+    const limitPriceInput = await waitForSelector(SELECTORS.limitPriceInput).catch(() => null);
+    if (!limitPriceInput) {
+        throw new Error("未找到买入限价输入框");
+    }
+    limitPriceInput.value = "";
+    await sleep(100);
+    await typeLikeUser(limitPriceInput, buyPriceStr, { delay: 10 });
+    await sleep(200);
+
+    const firstTotalInput = await waitForSelector(SELECTORS.limitTotalInputs).catch(() => null);
+    const totalInputs = $$(SELECTORS.limitTotalInputs);
+    if (!firstTotalInput || totalInputs.length < 2) {
+        throw new Error("数量/卖出输入框数量不足，期望至少 2 个");
+    }
+
+    const amountInput = totalInputs[0];
+    amountInput.value = "";
+    await sleep(100);
+    amountInput.click();
+    await sleep(100);
+    await typeLikeUser(amountInput, amount.toString(), { delay: 10 });
+    await sleep(200);
+
+    const sellPriceInput = totalInputs[1];
+    sellPriceInput.value = "";
+    await sleep(100);
+    await typeLikeUser(sellPriceInput, sellPriceStr, { delay: 10 });
+    await sleep(200);
+
+    const buyButton = $(SELECTORS.buyButton);
+    if (!buyButton) {
+        throw new Error("未找到买入按钮");
+    }
+    buyButton.click();
+
+    try {
+        const confirmBtn = await waitForSelector(SELECTORS.confirmButton, { timeout: 6000 });
+        confirmBtn.click();
+    } catch (err) {
+        throw new Error("没有找到确认按钮或确认弹框，交易可能未提交");
+    }
 
     return "";
 }
@@ -129,18 +304,70 @@ async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, trad
     const sessionId = Date.now();
     window.currentTradeSession = sessionId;
 
+    const sessionStartBalance = readDisplayedBalance();
+    const normalizedStartBalance = Number.isFinite(sessionStartBalance) ? sessionStartBalance : null;
+
+    if (!isReverseOrderEnabled()) {
+        const message = "检测到反向订单未勾选，交易已取消";
+        window.currentTradeSession = null;
+        pushTradeProgress({
+            total: tradeCount,
+            current: 0,
+            status: "error",
+            lastMessage: message,
+            lastError: "请先在页面勾选反向订单复选框。",
+            balanceBefore: normalizedStartBalance,
+            balanceAfter: normalizedStartBalance,
+            balanceChange: null
+        });
+        return message;
+    }
+
+    pushTradeProgress({
+        total: tradeCount,
+        current: 0,
+        status: "running",
+        lastMessage: `准备执行 ${tradeCount} 次交易`,
+        balanceBefore: normalizedStartBalance,
+        balanceAfter: normalizedStartBalance,
+        balanceChange: null
+    });
+
     for (let i = 1; i <= tradeCount; i++) {
         // 检查是否被暂停或会话已更改
         if (window.isTradingPaused || window.currentTradeSession !== sessionId) {
             console.log('交易已被暂停或停止');
+            pushTradeProgress({
+                status: "paused",
+                total: tradeCount,
+                current: Math.max(0, i - 1),
+                lastMessage: `交易已暂停，已完成 ${Math.max(0, i - 1)} / ${tradeCount}`,
+                balanceBefore: normalizedStartBalance
+            });
             return "交易已暂停";
         }
 
         console.log(`执行第 ${i}/${tradeCount} 次交易`);
 
+        pushTradeProgress({
+            status: "running",
+            total: tradeCount,
+            current: Math.max(0, i - 1),
+            lastMessage: `正在执行第 ${i} 次交易`,
+            balanceBefore: normalizedStartBalance
+        });
+
         try {
             await alphaBtnActionButtons(buyAdd, sellAdd, howMoney);
             console.log(`第 ${i} 次交易完成`);
+            pushTradeProgress({
+                status: "running",
+                total: tradeCount,
+                current: i,
+                lastMessage: `第 ${i} 次交易完成`,
+                lastError: null,
+                balanceBefore: normalizedStartBalance
+            });
 
             // 如果不是最后一次交易，等待间隔时间
             if (i < tradeCount) {
@@ -150,6 +377,13 @@ async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, trad
                 for (let waitTime = 0; waitTime < tradeInterval; waitTime++) {
                     if (window.isTradingPaused || window.currentTradeSession !== sessionId) {
                         console.log('等待期间交易被暂停');
+                        pushTradeProgress({
+                            status: "paused",
+                            total: tradeCount,
+                            current: i,
+                            lastMessage: "等待期间交易被暂停",
+                            balanceBefore: normalizedStartBalance
+                        });
                         return "交易已暂停";
                     }
                     await sleep(1000); // 每秒检查一次暂停状态
@@ -157,6 +391,14 @@ async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, trad
             }
         } catch (error) {
             console.error(`第 ${i} 次交易失败:`, error);
+            pushTradeProgress({
+                status: "running",
+                total: tradeCount,
+                current: Math.max(0, i - 1),
+                lastMessage: `第 ${i} 次交易失败：${error?.message || error}`,
+                lastError: error?.message || String(error),
+                balanceBefore: normalizedStartBalance
+            });
             // 即使失败也继续执行下次交易
             if (i < tradeCount) {
                 await sleep(tradeInterval * 1000);
@@ -167,125 +409,38 @@ async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, trad
     console.log(`所有 ${tradeCount} 次交易执行完成`);
     // 交易完成后重置状态
     window.currentTradeSession = null;
+    const finalBalance = readDisplayedBalance();
+    const normalizedFinalBalance = Number.isFinite(finalBalance) ? finalBalance : null;
+    const balanceChange = (normalizedStartBalance != null && normalizedFinalBalance != null)
+        ? normalizedStartBalance - normalizedFinalBalance
+        : null;
+    const formattedChange = formatAmount(balanceChange);
+    const completionMessage = (balanceChange != null && formattedChange)
+        ? `所有 ${tradeCount} 次交易执行完成，费用估算（USDT）：${formattedChange}`
+        : `所有 ${tradeCount} 次交易执行完成`;
+    pushTradeProgress({
+        status: "completed",
+        total: tradeCount,
+        current: tradeCount,
+        lastMessage: completionMessage,
+        lastError: null,
+        balanceBefore: normalizedStartBalance,
+        balanceAfter: normalizedFinalBalance,
+        balanceChange
+    });
     return "";
 }
-
-// 从当前页面抓取列表数据
-async function scrapeListData() {
-
-    var btns = $$(".bn-tab.bn-tab__primary-gray.data-size-small.data-font-4");
-    btns[1].click();
-    await sleep(2000);
-    btns[0].click();
-    await sleep(2000);
-
-    const list = $$(".bn-virtual-table > div > div");
-    list.forEach((item, index) => {
-        // 2.1 在每个 item 内按 class 查找
-        // const titleEl = $(".t-caption1", item);          // 匹配 .title
-        //const valueEl = $(".value", item);          // 匹配 .value
-
-
-        //刷新
-        //bn-tab bn-tab__primary-gray data-size-small data-font-4
-
-        console.log(btns[1]);
-
-
-        // await new Promise(r => setTimeout(r, 1000));
-
-
-
-        const subdivs = $$(".t-caption1", item);     // 匹配多个 .sub-text
-        var xx = subdivs[3].innerHTML;
-
-        //const titles = $(".mr-[2px] t-caption2 cursor-pointer", item);
-        const titles = $(".t-caption2.cursor-pointer", item);
-        var title = titles.innerHTML;
-        console.log(title + "=>>" + xx);
-        //subdivs.forEach((sdiv, i) => {
-        //    //var slll=$$("div", sdiv);
-
-        //});
-
-
-
-
-        //await new Promise(r => setTimeout(r, 1000));
-
-
-
-
-
-        // 2.2 在每个 item 内按 id 查找（不推荐重复 id 的场景）
-        //const idEl = $("#some-id", item);           // 仅在 item 内找 #some-id
-
-        //// 2.3 在每个 item 内按“第几个”查找（结构固定时使用）
-        //// 方式A：querySelector 的 :nth-child
-        //const thirdChild = $(":scope > div:nth-child(3)", item); // item 的第3个直接子 div
-        //// 方式B：先收集再用数组索引
-        //const childDivs = $$(":scope > div", item);
-        //const first = childDivs[0];
-        //const second = childDivs[1];
-
-        //// 2.4 取文本/属性
-        //const title = (titleEl?.textContent || "").trim();
-        //const value = (valueEl?.textContent || "").trim();
-        //const idText = (idEl?.textContent || "").trim();
-        //const thirdText = (thirdChild?.textContent || "").trim();
-
-        //// 2.5 取链接/图片等属性
-        //const linkHref = $("a", item)?.href || "";
-        //const imgSrc = $("img", item)?.src || "";
-
-        //// 2.6 打包结果
-        //const row = {
-        //    index,
-        //    title,
-        //    value,
-        //    idText,
-        //    thirdText,
-        //    linkHref,
-        //    imgSrc
-        //};
-        //console.log("row", row);
-    });
-    console.log("---------");
-
-
-
-    return;
-
-
-
-    const CONFIG = getConfig();
-    const items = $$(CONFIG.listItemSelector);
-    const rows = items.map(el => {
-        const titleEl = $(CONFIG.titleSelector, el);
-        const linkEl = $(CONFIG.linkSelector, el);
-        const descEl = $(CONFIG.descSelector, el);
-        return {
-            title: toText(titleEl),
-            link: linkEl && linkEl.href || "",
-            desc: toText(descEl),
-            _meta: {
-                timestamp: Date.now(),
-                location: location.href
-            }
-        };
-    }).filter(r => r.title || r.link || r.desc);
-
-    log("Scraped items:", rows.length, rows);
-    await store.set("lastScraped", rows);
-    return rows;
-}
-
 
 
 
 // 供 popup/background 调用的命令执行器
 async function handleCommand(cmd, payload) {
     switch (cmd) {
+        case "runDiagnostics":
+            runElementDiagnostics();
+            return getTradeProgressSnapshot();
+        case "getTradeProgress":
+            return getTradeProgressSnapshot();
         case "alphaBtn":
             const { buyAdd, sellAdd, howMoney, tradeCount, tradeInterval } = payload || {};
             // 重置暂停状态，开始新的交易
@@ -295,6 +450,27 @@ async function handleCommand(cmd, payload) {
             window.isTradingPaused = true;
             window.currentTradeSession = null;
             console.log('交易已停止');
+            const currentProgress = ensureTradeProgress();
+            const latestBalance = readDisplayedBalance();
+            const normalizedLatest = Number.isFinite(latestBalance) ? latestBalance : null;
+            const startBalance = Number.isFinite(currentProgress.balanceBefore)
+                ? currentProgress.balanceBefore
+                : (normalizedLatest ?? null);
+            const effectiveFinalBalance = normalizedLatest ?? currentProgress.balanceAfter ?? null;
+            const computedChange = (Number.isFinite(startBalance) && Number.isFinite(effectiveFinalBalance))
+                ? startBalance - effectiveFinalBalance
+                : (Number.isFinite(currentProgress.balanceChange) ? currentProgress.balanceChange : null);
+            const stopFormatted = formatAmount(computedChange);
+            const stopMessage = (computedChange != null && stopFormatted)
+                ? `用户已停止交易，当前费用估算（USDT）：${stopFormatted}`
+                : "用户已停止交易";
+            pushTradeProgress({
+                status: "stopped",
+                lastMessage: stopMessage,
+                balanceBefore: Number.isFinite(startBalance) ? startBalance : null,
+                balanceAfter: Number.isFinite(effectiveFinalBalance) ? effectiveFinalBalance : null,
+                balanceChange: Number.isFinite(computedChange) ? computedChange : null
+            });
             return "交易已停止";
         default:
             return null;
