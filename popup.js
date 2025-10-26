@@ -196,6 +196,10 @@ $("#stopBtn").addEventListener("click", async () => {
     }
 });
 
+$("#stabilityBtn").addEventListener("click", () => {
+    chrome.tabs.create({ url: "https://alpha123.uk/zh/stability/" });
+});
+
 
 
 
