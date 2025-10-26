@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Binance Alpha 测试页面 - 插件功能验证</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0b0e11;
+            color: #eaecef;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .test-banner {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .test-banner h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .test-banner p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 20px;
+        }
+
+        .sidebar {
+            background: #1e2329;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .main-content {
+            background: #1e2329;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .coin-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #2b3139;
+        }
+
+        .coin-icon {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+        }
+
+        .coin-info h2 {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+
+        .coin-info .pair {
+            color: #848e9c;
+            font-size: 14px;
+        }
+
+        /* 价格显示区域 */
+        .price-section {
+            margin-bottom: 30px;
+        }
+
+        .price-section h3 {
+            font-size: 14px;
+            color: #848e9c;
+            margin-bottom: 12px;
+        }
+
+        .price-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .price-item {
+            background: #2b3139;
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .price-item:hover {
+            background: #2e3642;
+        }
+
+        .price-item .label {
+            font-size: 12px;
+            color: #848e9c;
+            margin-bottom: 6px;
+        }
+
+        /* ⚠️ 插件需要的选择器 */
+        .flex-1.cursor-pointer {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0ecb81;
+        }
+
+        /* 订单簿 */
+        .orderbook {
+            background: #2b3139;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+
+        .orderbook h4 {
+            font-size: 14px;
+            margin-bottom: 12px;
+            color: #848e9c;
+        }
+
+        .orderbook-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+
+        .orderbook-row .price {
+            color: #0ecb81;
+        }
+
+        /* 交易表单区域 */
+        .trading-panel {
+            background: #2b3139;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        /* ⚠️ 插件可能需要的标签选择器 */
+        .bn-tab {
+            padding: 8px 16px;
+            background: transparent;
+            border: none;
+            color: #848e9c;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .bn-tab.active {
+            background: #1e2329;
+            color: #eaecef;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: #848e9c;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        /* ⚠️ 插件需要的输入框选择器 */
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            background: #1e2329;
+            border: 1px solid #2b3139;
+            border-radius: 8px;
+            color: #eaecef;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #f0b90b;
+        }
+
+        .input-with-suffix {
+            position: relative;
+        }
+
+        .input-suffix {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #848e9c;
+            font-size: 12px;
+        }
+
+        /* ⚠️ 反向订单复选框 */
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: #1e2329;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .checkbox-group:hover {
+            background: #252c35;
+        }
+
+        /* ⚠️ 插件需要的 checkbox 选择器 */
+        .bn-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            accent-color: #f0b90b;
+        }
+
+        .bn-checkbox.bn-checkbox__square {
+            border-radius: 4px;
+        }
+
+        .bn-checkbox.data-size-md {
+            width: 20px;
+            height: 20px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .checkbox-group label {
+            margin: 0;
+            cursor: pointer;
+            color: #eaecef;
+        }
+
+        /* ⚠️ 插件需要的按钮选择器 */
+        .bn-button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .bn-button__buy {
+            background: #0ecb81;
+            color: white;
+        }
+
+        .bn-button__buy:hover {
+            background: #0bb871;
+        }
+
+        .bn-button__sell {
+            background: #f6465d;
+            color: white;
+        }
+
+        .bn-button__primary {
+            background: #f0b90b;
+            color: #0b0e11;
+        }
+
+        .bn-button__primary:hover {
+            background: #f8d12f;
+        }
+
+        .data-size-middle {
+            height: 48px;
+        }
+
+        .w-full {
+            width: 100%;
+        }
+
+        /* 确认弹窗 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: #1e2329;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal h3 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #eaecef;
+        }
+
+        .modal-content {
+            margin-bottom: 24px;
+        }
+
+        .modal-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+            border-bottom: 1px solid #2b3139;
+        }
+
+        .modal-row:last-child {
+            border-bottom: none;
+        }
+
+        .modal-row .label {
+            color: #848e9c;
+        }
+
+        .modal-row .value {
+            font-weight: 600;
+            color: #eaecef;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .modal-actions button {
+            flex: 1;
+        }
+
+        /* 日志区域 */
+        .log-section {
+            margin-top: 30px;
+            background: #2b3139;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .log-section h3 {
+            font-size: 16px;
+            margin-bottom: 12px;
+            color: #f0b90b;
+        }
+
+        .log-content {
+            background: #0b0e11;
+            border-radius: 8px;
+            padding: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            color: #848e9c;
+        }
+
+        .log-entry.success {
+            color: #0ecb81;
+        }
+
+        .log-entry.error {
+            color: #f6465d;
+        }
+
+        .log-entry .timestamp {
+            color: #5e6673;
+            margin-right: 8px;
+        }
+
+        /* 虚拟表格（用于测试列表抓取功能） */
+        .bn-virtual-table {
+            margin-top: 20px;
+        }
+
+        .bn-virtual-table > div > div {
+            background: #2b3139;
+            padding: 12px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .t-caption2.cursor-pointer {
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .t-caption1 {
+            font-size: 12px;
+            color: #848e9c;
+        }
+
+        .gain-positive {
+            color: #0ecb81;
+        }
+
+        .gain-negative {
+            color: #f6465d;
+        }
+
+        /* 余额显示样式 */
+        #accountBalance {
+            transition: all 0.3s ease;
+        }
+
+        #accountBalance.balance-increase {
+            animation: balanceIncrease 0.6s ease;
+        }
+
+        #accountBalance.balance-decrease {
+            animation: balanceDecrease 0.6s ease;
+        }
+
+        @keyframes balanceIncrease {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); color: #0ecb81; }
+        }
+
+        @keyframes balanceDecrease {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); color: #f6465d; }
+        }
+    </style>
+</head>
+<body>
+    <div class="test-banner">
+        <h1>🧪 Binance Alpha 插件测试页面</h1>
+        <p>此页面模拟了 Binance Alpha 交易界面，用于测试 Chrome 扩展功能</p>
+    </div>
+
+    <div class="container">
+        <!-- 侧边栏 -->
+        <div class="sidebar">
+            <div class="orderbook">
+                <h4>📊 订单簿</h4>
+                <div class="orderbook-row">
+                    <span class="price">0.00123</span>
+                    <span>1500</span>
+                </div>
+                <div class="orderbook-row">
+                    <span class="price">0.00122</span>
+                    <span>2300</span>
+                </div>
+                <div class="orderbook-row">
+                    <span class="price">0.00121</span>
+                    <span>5000</span>
+                </div>
+            </div>
+
+            <!-- 虚拟列表（用于测试 scrapeListData） -->
+            <div class="bn-virtual-table">
+                <h4 style="color: #848e9c; margin-bottom: 12px;">📈 币种列表</h4>
+                <div>
+                    <div>
+                        <div>
+                            <div class="t-caption2 cursor-pointer">BTC/USDT</div>
+                            <div class="t-caption1">比特币</div>
+                            <div class="t-caption1">成交量: 1.2M</div>
+                            <div class="t-caption1 gain-positive">+5.23%</div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div>
+                        <div>
+                            <div class="t-caption2 cursor-pointer">ETH/USDT</div>
+                            <div class="t-caption1">以太坊</div>
+                            <div class="t-caption1">成交量: 800K</div>
+                            <div class="t-caption1 gain-positive">+3.15%</div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div>
+                        <div>
+                            <div class="t-caption2 cursor-pointer">SOL/USDT</div>
+                            <div class="t-caption1">Solana</div>
+                            <div class="t-caption1">成交量: 500K</div>
+                            <div class="t-caption1 gain-negative">-1.82%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 主内容区 -->
+        <div class="main-content">
+            <!-- 币种头部 -->
+            <div class="coin-header">
+                <div class="coin-icon">A</div>
+                <div class="coin-info">
+                    <h2>ALPHA Token</h2>
+                    <div class="pair">ALPHA/USDT</div>
+                </div>
+                <div style="margin-left: auto; text-align: right;">
+                    <div style="font-size: 11px; color: #848e9c; margin-bottom: 4px;">
+                        可用余额 (USDT)
+                        <button onclick="resetBalance()" style="margin-left: 8px; padding: 2px 8px; font-size: 10px; background: #2b3139; border: 1px solid #374151; border-radius: 4px; color: #848e9c; cursor: pointer;">重置</button>
+                    </div>
+                    <!-- ⚠️ 关键元素：账户余额显示 -->
+                    <div class="text-PrimaryText text-[12px] leading-[18px] font-[500]" id="accountBalance" style="font-size: 16px; font-weight: 700; color: #eaecef;">1000.00</div>
+                </div>
+            </div>
+
+            <!-- 价格显示 -->
+            <div class="price-section">
+                <h3>💰 实时价格</h3>
+                <div class="price-grid">
+                    <div class="price-item">
+                        <div class="label">最新价</div>
+                        <!-- ⚠️ 关键选择器：插件会读取这个元素 -->
+                        <div class="flex-1 cursor-pointer">0.00120</div>
+                    </div>
+                    <div class="price-item">
+                        <div class="label">24h涨幅</div>
+                        <div class="flex-1 cursor-pointer" style="color: #0ecb81;">+12.50%</div>
+                    </div>
+                    <div class="price-item">
+                        <div class="label">24h成交量</div>
+                        <div class="flex-1 cursor-pointer" style="color: #eaecef;">$2.5M</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 交易表单 -->
+            <div class="trading-panel">
+                <div class="tabs">
+                    <!-- ⚠️ 插件可能会点击这些标签 -->
+                    <button class="bn-tab bn-tab__primary-gray data-size-small data-font-4 active">限价单</button>
+                    <button class="bn-tab bn-tab__primary-gray data-size-small data-font-4">市价单</button>
+                </div>
+
+                <form id="tradeForm">
+                    <div class="form-group">
+                        <label for="limitPrice">买入价格</label>
+                        <div class="input-with-suffix">
+                            <!-- ⚠️ 关键输入框：#limitPrice -->
+                            <input type="text" id="limitPrice" placeholder="0.00000">
+                            <span class="input-suffix">USDT</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="limitTotal">买入数量</label>
+                        <div class="input-with-suffix">
+                            <!-- ⚠️ 关键输入框：#limitTotal (第1个) -->
+                            <input type="text" id="limitTotal" placeholder="0">
+                            <span class="input-suffix">USDT</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sellPrice">卖出价格</label>
+                        <div class="input-with-suffix">
+                            <!-- ⚠️ 关键输入框：#limitTotal (第2个) -->
+                            <input type="text" id="limitTotal" placeholder="0.00000">
+                            <span class="input-suffix">USDT</span>
+                        </div>
+                    </div>
+
+                    <!-- ⚠️ 关键复选框：反向订单 -->
+                    <div class="checkbox-group" onclick="document.getElementById('reverseOrder').checked = !document.getElementById('reverseOrder').checked">
+                        <input type="checkbox" id="reverseOrder" class="bn-checkbox bn-checkbox__square data-size-md" onclick="event.stopPropagation()">
+                        <label for="reverseOrder" onclick="event.stopPropagation()">启用反向订单（买入后自动挂卖单）</label>
+                    </div>
+
+                    <!-- ⚠️ 关键按钮：买入按钮 -->
+                    <button type="button" class="bn-button bn-button__buy data-size-middle w-full" onclick="showConfirmModal()">
+                        买入 ALPHA
+                    </button>
+                </form>
+            </div>
+
+            <!-- 日志区域 -->
+            <div class="log-section">
+                <h3>📋 操作日志</h3>
+                <div class="log-content" id="logContent">
+                    <div class="log-entry">
+                        <span class="timestamp">[00:00:00]</span>
+                        等待插件操作...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⚠️ 确认弹窗 -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h3>✅ 确认交易</h3>
+            <div class="modal-content">
+                <div class="modal-row">
+                    <span class="label">交易对</span>
+                    <span class="value">ALPHA/USDT</span>
+                </div>
+                <div class="modal-row">
+                    <span class="label">买入价格</span>
+                    <span class="value" id="modalBuyPrice">-</span>
+                </div>
+                <div class="modal-row">
+                    <span class="label">买入数量</span>
+                    <span class="value" id="modalAmount">-</span>
+                </div>
+                <div class="modal-row">
+                    <span class="label">卖出价格</span>
+                    <span class="value" id="modalSellPrice">-</span>
+                </div>
+                <div class="modal-row">
+                    <span class="label">反向订单</span>
+                    <span class="value" id="modalReverseOrder">-</span>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="bn-button bn-button__primary data-size-middle w-full" onclick="confirmTrade()">
+                    确认
+                </button>
+                <button class="bn-button data-size-middle w-full" style="background: #2b3139; color: #eaecef;" onclick="closeModal()">
+                    取消
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 日志功能
+        function addLog(message, type = 'info') {
+            const logContent = document.getElementById('logContent');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `<span class="timestamp">[${timestamp}]</span>${message}`;
+            logContent.appendChild(entry);
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+
+        // 显示确认弹窗
+        function showConfirmModal() {
+            const buyPriceInput = document.querySelectorAll('#limitPrice')[0];
+            const amountInput = document.querySelectorAll('#limitTotal')[0];
+            const sellPriceInput = document.querySelectorAll('#limitTotal')[1];
+
+            const buyPrice = buyPriceInput?.value || '未填写';
+            const amount = amountInput?.value || '未填写';
+            const sellPrice = sellPriceInput?.value || '未填写';
+            const reverseOrder = document.getElementById('reverseOrder').checked;
+
+            addLog(`📋 弹窗前读取: 买入价="${buyPrice}", 数量="${amount}", 卖出价="${sellPrice}"`, 'info');
+
+            document.getElementById('modalBuyPrice').textContent = buyPrice + ' USDT';
+            document.getElementById('modalAmount').textContent = amount + ' USDT';
+            document.getElementById('modalSellPrice').textContent = sellPrice + ' USDT';
+            document.getElementById('modalReverseOrder').textContent = reverseOrder ? '✅ 已启用' : '❌ 未启用';
+
+            document.getElementById('modalOverlay').classList.add('show');
+
+            addLog('🔔 显示确认弹窗', 'info');
+        }
+
+        // 关闭弹窗
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('show');
+            addLog('❌ 取消交易', 'error');
+        }
+
+        // 确认交易
+        function confirmTrade() {
+            const buyPrice = parseFloat(document.querySelectorAll('#limitPrice')[0].value) || 0;
+            const amount = parseFloat(document.querySelectorAll('#limitTotal')[0].value) || 0;
+            const sellPrice = parseFloat(document.querySelectorAll('#limitTotal')[1].value) || 0;
+            const reverseOrder = document.getElementById('reverseOrder').checked;
+
+            addLog(`🔍 读取输入: 买入价=${buyPrice}, 数量=${amount}, 卖出价=${sellPrice}, 反向订单=${reverseOrder}`, 'info');
+
+            // 获取当前余额
+            const balanceEl = document.getElementById('accountBalance');
+            const currentBalance = parseFloat(balanceEl.textContent) || 1000;
+            addLog(`💼 交易前余额: ${currentBalance.toFixed(2)} USDT`, 'info');
+
+            let netChange = 0;
+
+            if (reverseOrder) {
+                // 启用反向订单：买入后立即卖出
+                // 买入成本
+                const buyCost = amount;
+
+                // 计算买到的币数量
+                const coinAmount = amount / buyPrice;
+
+                // 卖出收入
+                const sellIncome = coinAmount * sellPrice;
+
+                // 净变化 = 卖出收入 - 买入成本（只算价差摩擦）
+                netChange = sellIncome - buyCost;
+
+                addLog(`✅ 交易成功！买入价: ${buyPrice}, 数量: ${amount} USDT, 卖出价: ${sellPrice}`, 'success');
+                addLog(`💰 买入成本: ${buyCost.toFixed(4)} USDT → 获得 ${coinAmount.toFixed(2)} 个币`, 'info');
+                addLog(`💰 卖出 ${coinAmount.toFixed(2)} 个币 → 收入 ${sellIncome.toFixed(4)} USDT`, 'info');
+                addLog(`💸 价差摩擦: ${netChange >= 0 ? '+' : ''}${netChange.toFixed(4)} USDT (${netChange >= 0 ? '盈利' : '亏损'})`, netChange >= 0 ? 'success' : 'error');
+            } else {
+                // 未启用反向订单：仅买入，不卖出
+                // 余额全部花掉（实际应该是拿到币，但这里简化为余额减少）
+                netChange = -amount;
+                addLog(`✅ 买入成功！买入价: ${buyPrice}, 花费: ${amount} USDT (未设置卖出)`, 'success');
+                addLog(`💸 余额减少: ${amount.toFixed(2)} USDT (仅买入，未卖出)`, 'error');
+            }
+
+            // 更新余额
+            const newBalance = currentBalance + netChange;
+            const newBalanceRounded = parseFloat(newBalance.toFixed(2));
+            balanceEl.textContent = newBalanceRounded.toFixed(2);
+
+            // 验证余额是否真的更新了（允许0.01的误差）
+            const verifyBalance = parseFloat(balanceEl.textContent);
+            const isCorrect = Math.abs(verifyBalance - newBalanceRounded) < 0.01;
+            addLog(`💼 余额更新: ${currentBalance.toFixed(2)} → ${newBalanceRounded.toFixed(2)} USDT`, 'info');
+            addLog(`✅ 余额验证: DOM显示为 ${verifyBalance.toFixed(2)} USDT ${isCorrect ? '(正确)' : '(异常!)'}`, isCorrect ? 'success' : 'error');
+
+            // 添加余额变化动画
+            balanceEl.classList.remove('balance-increase', 'balance-decrease');
+            setTimeout(() => {
+                if (netChange > 0) {
+                    balanceEl.classList.add('balance-increase');
+                } else if (netChange < 0) {
+                    balanceEl.classList.add('balance-decrease');
+                }
+                setTimeout(() => {
+                    balanceEl.classList.remove('balance-increase', 'balance-decrease');
+                }, 600);
+            }, 10);
+
+            closeModal();
+
+            // 清空表单
+            document.querySelectorAll('input[type="text"]').forEach(input => input.value = '');
+        }
+
+        // 监听输入变化
+        document.querySelectorAll('input').forEach((input, index) => {
+            input.addEventListener('input', (e) => {
+                // 由于有重复的 id="limitTotal"，用更详细的描述
+                let fieldName = e.target.id || e.target.name || '未知字段';
+                if (e.target.id === 'limitTotal') {
+                    const allLimitTotal = document.querySelectorAll('#limitTotal');
+                    const inputIndex = Array.from(allLimitTotal).indexOf(e.target);
+                    if (inputIndex === 0) {
+                        fieldName = 'limitTotal[买入数量]';
+                    } else if (inputIndex === 1) {
+                        fieldName = 'limitTotal[卖出价格]';
+                    } else {
+                        fieldName = `limitTotal[${inputIndex}]`;
+                    }
+                }
+                addLog(`📝 输入变化: ${fieldName} = "${e.target.value}"`, 'info');
+            });
+        });
+
+        // 监听复选框变化
+        document.getElementById('reverseOrder').addEventListener('change', (e) => {
+            // 同步 aria-checked 属性，让插件的 isReverseOrderEnabled() 能正确检测
+            e.target.setAttribute('aria-checked', e.target.checked ? 'true' : 'false');
+            addLog(`${e.target.checked ? '✅' : '❌'} 反向订单状态: ${e.target.checked ? '已启用' : '已禁用'}`, e.target.checked ? 'success' : 'info');
+        });
+
+        // 重置余额
+        function resetBalance() {
+            const balanceEl = document.getElementById('accountBalance');
+            balanceEl.textContent = '1000.00';
+            addLog('🔄 余额已重置为 1000.00 USDT', 'info');
+        }
+
+        // 页面加载完成
+        window.addEventListener('load', () => {
+            // 初始化复选框的 aria-checked 属性
+            const checkbox = document.getElementById('reverseOrder');
+            checkbox.setAttribute('aria-checked', checkbox.checked ? 'true' : 'false');
+
+            addLog('🚀 测试页面加载完成', 'success');
+            addLog('💡 提示：打开 Chrome 扩展，点击"执行交易"按钮进行测试', 'info');
+            addLog('⚠️ 当前价格: 0.00120 USDT', 'info');
+            addLog('💼 初始余额: 1000.00 USDT', 'info');
+        });
+
+        // 模拟价格变动
+        setInterval(() => {
+            const priceElement = document.querySelector('.flex-1.cursor-pointer');
+            const currentPrice = parseFloat(priceElement.textContent);
+            const change = (Math.random() - 0.5) * 0.00002;
+            const newPrice = (currentPrice + change).toFixed(5);
+            priceElement.textContent = newPrice;
+        }, 3000);
+    </script>
+</body>
+</html>
