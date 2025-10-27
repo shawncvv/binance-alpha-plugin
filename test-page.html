@@ -725,7 +725,7 @@
             addLog('❌ 取消交易', 'error');
         }
 
-        // 确认交易
+        // 确认交易（简化版：固定扣除 0.1 USDT 磨损）
         function confirmTrade() {
             const buyPrice = parseFloat(document.querySelectorAll('#limitPrice')[0].value) || 0;
             const amount = parseFloat(document.querySelectorAll('#limitTotal')[0].value) || 0;
@@ -739,28 +739,17 @@
             const currentBalance = parseFloat(balanceEl.textContent) || 1000;
             addLog(`💼 交易前余额: ${currentBalance.toFixed(2)} USDT`, 'info');
 
-            let netChange = 0;
+            // 固定扣除 0.1 USDT 作为磨损费用
+            const FIXED_FRICTION = 0.1;
+            const netChange = -FIXED_FRICTION;
 
             if (reverseOrder) {
-                // 启用反向订单：买入后立即卖出，仅模拟磨损成本
-                const buyCost = amount;
-                const coinAmount = buyPrice > 0 ? amount / buyPrice : 0;
-                const sellIncome = coinAmount * sellPrice;
-                const friction = Math.abs(sellIncome - buyCost);
-
-                // 净变化仅扣除磨损金额，避免测试余额不断放大
-                netChange = -friction;
-
                 addLog(`✅ 交易成功！买入价: ${buyPrice}, 数量: ${amount} USDT, 卖出价: ${sellPrice}`, 'success');
-                addLog(`💰 买入成本: ${buyCost.toFixed(4)} USDT → 获得 ${coinAmount.toFixed(4)} 个币`, 'info');
-                addLog(`💰 卖出 ${coinAmount.toFixed(4)} 个币 → 收入 ${sellIncome.toFixed(4)} USDT`, 'info');
-                addLog(`💸 价差磨损: -${friction.toFixed(4)} USDT`, friction > 0 ? 'error' : 'info');
+                addLog(`💰 模拟买入+反向卖出完成`, 'info');
+                addLog(`💸 固定磨损: -${FIXED_FRICTION.toFixed(2)} USDT`, 'error');
             } else {
-                // 未启用反向订单：仅买入，不卖出
-                // 余额全部花掉（实际应该是拿到币，但这里简化为余额减少）
-                netChange = -amount;
-                addLog(`✅ 买入成功！买入价: ${buyPrice}, 花费: ${amount} USDT (未设置卖出)`, 'success');
-                addLog(`💸 余额减少: ${amount.toFixed(2)} USDT (仅买入，未卖出)`, 'error');
+                addLog(`⚠️ 交易成功但未启用反向订单`, 'success');
+                addLog(`💸 固定磨损: -${FIXED_FRICTION.toFixed(2)} USDT`, 'error');
             }
 
             // 更新余额
@@ -768,7 +757,7 @@
             const newBalanceRounded = parseFloat(newBalance.toFixed(2));
             balanceEl.textContent = newBalanceRounded.toFixed(2);
 
-            // 验证余额是否真的更新了（允许0.01的误差）
+            // 验证余额是否真的更新了
             const verifyBalance = parseFloat(balanceEl.textContent);
             const isCorrect = Math.abs(verifyBalance - newBalanceRounded) < 0.01;
             addLog(`💼 余额更新: ${currentBalance.toFixed(2)} → ${newBalanceRounded.toFixed(2)} USDT`, 'info');
@@ -777,13 +766,9 @@
             // 添加余额变化动画
             balanceEl.classList.remove('balance-increase', 'balance-decrease');
             setTimeout(() => {
-                if (netChange > 0) {
-                    balanceEl.classList.add('balance-increase');
-                } else if (netChange < 0) {
-                    balanceEl.classList.add('balance-decrease');
-                }
+                balanceEl.classList.add('balance-decrease');
                 setTimeout(() => {
-                    balanceEl.classList.remove('balance-increase', 'balance-decrease');
+                    balanceEl.classList.remove('balance-decrease');
                 }, 600);
             }, 10);
 
