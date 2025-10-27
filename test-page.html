@@ -742,23 +742,19 @@
             let netChange = 0;
 
             if (reverseOrder) {
-                // 启用反向订单：买入后立即卖出
-                // 买入成本
+                // 启用反向订单：买入后立即卖出，仅模拟磨损成本
                 const buyCost = amount;
-
-                // 计算买到的币数量
-                const coinAmount = amount / buyPrice;
-
-                // 卖出收入
+                const coinAmount = buyPrice > 0 ? amount / buyPrice : 0;
                 const sellIncome = coinAmount * sellPrice;
+                const friction = Math.abs(sellIncome - buyCost);
 
-                // 净变化 = 卖出收入 - 买入成本（只算价差摩擦）
-                netChange = sellIncome - buyCost;
+                // 净变化仅扣除磨损金额，避免测试余额不断放大
+                netChange = -friction;
 
                 addLog(`✅ 交易成功！买入价: ${buyPrice}, 数量: ${amount} USDT, 卖出价: ${sellPrice}`, 'success');
-                addLog(`💰 买入成本: ${buyCost.toFixed(4)} USDT → 获得 ${coinAmount.toFixed(2)} 个币`, 'info');
-                addLog(`💰 卖出 ${coinAmount.toFixed(2)} 个币 → 收入 ${sellIncome.toFixed(4)} USDT`, 'info');
-                addLog(`💸 价差摩擦: ${netChange >= 0 ? '+' : ''}${netChange.toFixed(4)} USDT (${netChange >= 0 ? '盈利' : '亏损'})`, netChange >= 0 ? 'success' : 'error');
+                addLog(`💰 买入成本: ${buyCost.toFixed(4)} USDT → 获得 ${coinAmount.toFixed(4)} 个币`, 'info');
+                addLog(`💰 卖出 ${coinAmount.toFixed(4)} 个币 → 收入 ${sellIncome.toFixed(4)} USDT`, 'info');
+                addLog(`💸 价差磨损: -${friction.toFixed(4)} USDT`, friction > 0 ? 'error' : 'info');
             } else {
                 // 未启用反向订单：仅买入，不卖出
                 // 余额全部花掉（实际应该是拿到币，但这里简化为余额减少）
