@@ -546,6 +546,12 @@
 
         <!-- 右侧主内容 -->
         <div class="main-content">
+            <!-- 当前交易编号显示 -->
+            <div style="margin-bottom: 16px; padding: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; text-align: center;">
+                <div style="font-size: 12px; color: rgba(255,255,255,0.8); margin-bottom: 4px;">当前交易编号</div>
+                <div id="currentTradeNumber" style="font-size: 36px; font-weight: 900; color: white;">-</div>
+            </div>
+
             <!-- 余额显示 -->
             <div style="text-align: right; margin-bottom: 20px; padding: 16px; background: #2b3139; border-radius: 12px;">
                 <div style="font-size: 12px; color: #848e9c; margin-bottom: 4px;">账户余额 (USDT)</div>
@@ -701,6 +707,7 @@
         function showConfirmModal() {
             tradeCounter++;
 
+            const scenario = document.getElementById('testScenario').value;
             const buyPrice = document.querySelectorAll('#limitPrice')[0]?.value || '0.00120';
             const amount = document.querySelectorAll('#limitTotal')[0]?.value || '10';
             const sellPrice = document.querySelectorAll('#limitTotal')[1]?.value || '0.00118';
@@ -711,8 +718,12 @@
 
             document.getElementById('modalOverlay').classList.add('show');
 
-            addLog(`📋 第 ${tradeCounter} 次交易确认弹窗显示`, 'info');
+            addLog(`📋 [弹窗] 第 ${tradeCounter} 次交易确认弹窗显示（场景: ${scenario}）`, 'info');
+            addLog(`🔍 [调试] tradeCounter 递增为: ${tradeCounter}`, 'info');
             updateQueueStatus('运行中', tradeCounter - 1, tradeCounter);
+
+            // 更新显著的交易编号显示
+            document.getElementById('currentTradeNumber').textContent = `#${tradeCounter}`;
         }
 
         // ========== 关闭弹窗 ==========
@@ -748,6 +759,9 @@
 
         // ========== 确认交易（核心逻辑） ==========
         async function confirmTrade() {
+            // ⚠️ 关键修复：记录当前交易编号用于判断
+            const currentTradeNumber = tradeCounter;
+
             const scenario = document.getElementById('testScenario').value;
             const baseFriction = parseFloat(document.getElementById('frictionAmount').value);
             const responseDelay = parseInt(document.getElementById('responseDelay').value);
@@ -757,6 +771,7 @@
             const balanceEl = document.getElementById('accountBalance');
             const currentBalance = parseFloat(balanceEl.textContent);
 
+            addLog(`🔍 [调试] 当前交易编号: ${currentTradeNumber}, 场景: ${scenario}`, 'info');
             addLog(`💼 交易前余额: ${currentBalance.toFixed(2)} USDT`, 'info');
 
             // 模拟网络延迟
@@ -772,19 +787,26 @@
             switch (scenario) {
                 case 'normal':
                     friction = baseFriction;
+                    addLog(`✅ [场景] 正常模式，磨损: ${friction.toFixed(2)} USDT`, 'info');
                     break;
 
                 case 'third-fail':
-                    if (tradeCounter === 3) {
+                    if (currentTradeNumber === 3) {
                         friction = 5.0;
                         shouldFail = true;
+                        addLog(`❌ [场景] 第3次失败触发！磨损: ${friction.toFixed(2)} USDT`, 'warning');
+                    } else {
+                        addLog(`✅ [场景] 第${currentTradeNumber}次正常，磨损: ${friction.toFixed(2)} USDT`, 'info');
                     }
                     break;
 
                 case 'fifth-fail':
-                    if (tradeCounter === 5) {
+                    if (currentTradeNumber === 5) {
                         friction = 5.0;
                         shouldFail = true;
+                        addLog(`❌ [场景] 第5次失败触发！磨损: ${friction.toFixed(2)} USDT`, 'warning');
+                    } else {
+                        addLog(`✅ [场景] 第${currentTradeNumber}次正常，磨损: ${friction.toFixed(2)} USDT`, 'info');
                     }
                     break;
 
@@ -792,32 +814,37 @@
                     if (Math.random() < 0.15) {
                         friction = 5.0;
                         shouldFail = true;
+                        addLog(`🎲 [场景] 随机失败触发！磨损: ${friction.toFixed(2)} USDT`, 'warning');
+                    } else {
+                        addLog(`✅ [场景] 随机成功，磨损: ${friction.toFixed(2)} USDT`, 'info');
                     }
                     break;
 
                 case 'progressive':
                     const progressiveValues = [0.1, 0.5, 1.0, 2.0, 5.0];
-                    const index = Math.min(tradeCounter - 1, progressiveValues.length - 1);
+                    const index = Math.min(currentTradeNumber - 1, progressiveValues.length - 1);
                     friction = progressiveValues[index];
                     if (friction >= 5.0) shouldFail = true;
+                    addLog(`📈 [场景] 渐进失败，第${currentTradeNumber}次磨损: ${friction.toFixed(2)} USDT${shouldFail ? ' (触发)' : ''}`, shouldFail ? 'warning' : 'info');
                     break;
 
                 case 'delay':
                     const delayMs = 1000 + Math.random() * 2000;
-                    addLog(`⏱️ 场景延迟 ${delayMs.toFixed(0)}ms`, 'warning');
+                    addLog(`⏱️ [场景] 网络延迟 ${delayMs.toFixed(0)}ms`, 'warning');
                     await new Promise(r => setTimeout(r, delayMs));
                     break;
 
                 case 'unstable-balance':
+                    addLog(`📊 [场景] 余额不稳定模拟`, 'info');
                     // 在后续余额更新时处理
                     break;
             }
 
             // 检查用户指定的失败位置
-            if (failAtPosition > 0 && tradeCounter === failAtPosition) {
+            if (failAtPosition > 0 && currentTradeNumber === failAtPosition) {
                 friction = 5.0;
                 shouldFail = true;
-                addLog(`⚠️ 手动触发失败（第 ${failAtPosition} 次）`, 'warning');
+                addLog(`⚠️ [手动] 指定第 ${failAtPosition} 次失败触发！`, 'warning');
             }
 
             // 更新余额
@@ -833,13 +860,14 @@
             // 记录结果
             if (shouldFail) {
                 failCount++;
-                addLog(`❌ 第 ${tradeCounter} 次交易：余额异常变化 ${friction.toFixed(2)} USDT (超过容差)`, 'error');
+                addLog(`❌ 第 ${currentTradeNumber} 次交易：余额异常变化 ${friction.toFixed(2)} USDT (超过容差)`, 'error');
                 addLog(`🛑 余额保护触发！应停止所有后续交易`, 'error');
-                updateQueueStatus('已停止', tradeCounter, tradeCounter);
+                addLog(`📊 [统计] 成功: ${successCount}, 失败: ${failCount}, 总计: ${currentTradeNumber}`, 'warning');
+                updateQueueStatus('已停止', currentTradeNumber, currentTradeNumber);
             } else {
                 successCount++;
-                addLog(`✅ 第 ${tradeCounter} 次交易成功，磨损 ${friction.toFixed(2)} USDT`, 'success');
-                updateQueueStatus('运行中', tradeCounter, tradeCounter);
+                addLog(`✅ 第 ${currentTradeNumber} 次交易成功，磨损 ${friction.toFixed(2)} USDT`, 'success');
+                updateQueueStatus('运行中', currentTradeNumber, currentTradeNumber);
             }
 
             addLog(`💼 余额更新: ${currentBalance.toFixed(2)} → ${newBalance.toFixed(2)} USDT`, 'info');
@@ -860,11 +888,13 @@
 
             document.getElementById('accountBalance').textContent = '1000.00';
             document.getElementById('initialBalance').textContent = '1000.00 USDT';
+            document.getElementById('currentTradeNumber').textContent = '-';
 
             updateQueueStatus('待机', 0, 0);
 
             clearLog();
             addLog('🔄 测试已重置', 'success');
+            addLog(`🔍 [调试] tradeCounter 已重置为: ${tradeCounter}`, 'info');
         }
 
         // ========== 页面加载 ==========
