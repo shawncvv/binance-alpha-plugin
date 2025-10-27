@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交易队列测试页面 - 余额保护功能验证</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0b0e11;
+            color: #eaecef;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .test-banner {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .test-banner h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+        }
+
+        .sidebar, .main-content {
+            background: #1e2329;
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .section {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #f0b90b;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* 测试场景选择器 */
+        .scenario-selector {
+            width: 100%;
+            padding: 12px;
+            background: #2b3139;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            color: #eaecef;
+            font-size: 14px;
+            cursor: pointer;
+            margin-bottom: 12px;
+        }
+
+        .scenario-selector:focus {
+            outline: none;
+            border-color: #f0b90b;
+        }
+
+        /* 队列状态面板 */
+        .queue-status {
+            background: linear-gradient(135deg, #2b3139 0%, #1a1f26 100%);
+            border-radius: 12px;
+            padding: 20px;
+            border: 2px solid #374151;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #2b3139;
+        }
+
+        .status-row:last-child {
+            border-bottom: none;
+        }
+
+        .status-label {
+            color: #848e9c;
+            font-size: 13px;
+        }
+
+        .status-value {
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .status-value.success {
+            color: #0ecb81;
+        }
+
+        .status-value.error {
+            color: #f6465d;
+        }
+
+        .status-value.warning {
+            color: #f0b90b;
+        }
+
+        /* 参数配置 */
+        .param-group {
+            margin-bottom: 16px;
+        }
+
+        .param-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #848e9c;
+            margin-bottom: 8px;
+        }
+
+        .param-value {
+            color: #f0b90b;
+            font-weight: 600;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: #2b3139;
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #f0b90b;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            background: #2b3139;
+            border: 1px solid #374151;
+            border-radius: 6px;
+            color: #eaecef;
+            font-size: 14px;
+        }
+
+        /* 开关按钮 */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #2b3139;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .toggle-slider {
+            background-color: #0ecb81;
+        }
+
+        input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+
+        /* 交易表单（保留原有选择器） */
+        .price-item {
+            background: #2b3139;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+        }
+
+        .flex-1.cursor-pointer {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0ecb81;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 12px;
+            color: #848e9c;
+            margin-bottom: 8px;
+        }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            background: #2b3139;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            color: #eaecef;
+            font-size: 14px;
+        }
+
+        /* 复选框 */
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 16px;
+            padding: 12px;
+            background: #2b3139;
+            border-radius: 8px;
+        }
+
+        .bn-checkbox.bn-checkbox__square.data-size-md {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #f0b90b;
+        }
+
+        /* 按钮 */
+        .bn-button {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .bn-button__buy {
+            background: #0ecb81;
+            color: white;
+        }
+
+        .bn-button__buy:hover {
+            background: #0bb871;
+        }
+
+        .bn-button__primary {
+            background: #f0b90b;
+            color: #0b0e11;
+        }
+
+        .bn-button__primary:hover {
+            background: #f8d12f;
+        }
+
+        .data-size-middle {
+            height: 48px;
+        }
+
+        .w-full {
+            width: 100%;
+        }
+
+        /* 确认弹窗 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.show {
+            display: flex;
+        }
+
+        .modal {
+            background: #1e2329;
+            border-radius: 12px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .modal h3 {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+
+        .modal-content {
+            margin-bottom: 24px;
+        }
+
+        .modal-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 14px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* 日志 */
+        .log-section {
+            background: #0b0e11;
+            border-radius: 8px;
+            padding: 16px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .log-entry {
+            padding: 6px 0;
+            border-bottom: 1px solid #1e2329;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-entry.success {
+            color: #0ecb81;
+        }
+
+        .log-entry.error {
+            color: #f6465d;
+        }
+
+        .log-entry.warning {
+            color: #f0b90b;
+        }
+
+        .log-entry.info {
+            color: #848e9c;
+        }
+
+        .log-entry .timestamp {
+            color: #5e6673;
+            margin-right: 8px;
+        }
+
+        /* 余额动画 */
+        @keyframes balanceDecrease {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); color: #f6465d; }
+        }
+
+        .balance-decrease {
+            animation: balanceDecrease 0.6s ease;
+        }
+
+        /* 控制按钮 */
+        .control-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .control-buttons button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-clear {
+            background: #2b3139;
+            color: #848e9c;
+        }
+
+        .btn-clear:hover {
+            background: #374151;
+        }
+
+        .btn-reset {
+            background: #f6465d;
+            color: white;
+        }
+
+        .btn-reset:hover {
+            background: #d63e52;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-banner">
+        <h1>🧪 交易队列测试页面</h1>
+        <p>测试余额保护机制在多次交易场景下的表现</p>
+    </div>
+
+    <div class="container">
+        <!-- 左侧控制面板 -->
+        <div class="sidebar">
+            <!-- 测试场景选择 -->
+            <div class="section">
+                <div class="section-title">📋 测试场景</div>
+                <select id="testScenario" class="scenario-selector">
+                    <option value="normal">✅ 正常模式（固定 0.1 USDT）</option>
+                    <option value="third-fail">❌ 第3次失败（触发余额保护）</option>
+                    <option value="fifth-fail">❌ 第5次失败（触发余额保护）</option>
+                    <option value="random-fail">🎲 随机失败（15% 概率）</option>
+                    <option value="progressive">📈 渐进失败（磨损逐渐增大）</option>
+                    <option value="delay">⏱️ 网络延迟（1-3秒）</option>
+                    <option value="unstable-balance">📊 余额不稳定（测试稳定检测）</option>
+                </select>
+                <div style="font-size: 11px; color: #848e9c; padding: 8px; background: #2b3139; border-radius: 6px;">
+                    <span id="scenarioDescription">选择测试场景查看说明</span>
+                </div>
+            </div>
+
+            <!-- 队列状态 -->
+            <div class="section">
+                <div class="section-title">📊 队列状态</div>
+                <div class="queue-status">
+                    <div class="status-row">
+                        <span class="status-label">状态</span>
+                        <span class="status-value" id="queueStatus">待机</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">当前进度</span>
+                        <span class="status-value" id="queueProgress">0 / 0</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">✅ 成功</span>
+                        <span class="status-value success" id="successCount">0</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">❌ 失败</span>
+                        <span class="status-value error" id="failCount">0</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">初始余额</span>
+                        <span class="status-value" id="initialBalance">1000.00 USDT</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">当前余额</span>
+                        <span class="status-value" id="currentBalance">1000.00 USDT</span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">累计磨损</span>
+                        <span class="status-value error" id="totalFriction">0.00 USDT</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 高级参数（可选） -->
+            <div class="section">
+                <div class="section-title">⚙️ 高级参数</div>
+
+                <div class="param-group">
+                    <div class="param-label">
+                        <span>基础磨损金额</span>
+                        <span class="param-value" id="frictionDisplay">0.10 USDT</span>
+                    </div>
+                    <input type="range" id="frictionAmount" min="0.05" max="5" step="0.05" value="0.1">
+                </div>
+
+                <div class="param-group">
+                    <div class="param-label">
+                        <span>响应延迟</span>
+                        <span class="param-value" id="delayDisplay">500 ms</span>
+                    </div>
+                    <input type="range" id="responseDelay" min="0" max="5000" step="100" value="500">
+                </div>
+
+                <div class="param-group">
+                    <div class="param-label">
+                        <span>指定失败位置（第X次）</span>
+                    </div>
+                    <input type="number" id="failAtPosition" min="0" max="100" value="0" placeholder="0 = 不指定">
+                </div>
+
+                <div class="param-group">
+                    <div class="param-label">
+                        <span>余额不稳定模拟</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="unstableBalance">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 控制按钮 -->
+            <div class="control-buttons">
+                <button class="btn-clear" onclick="clearLog()">清空日志</button>
+                <button class="btn-reset" onclick="resetTest()">重置测试</button>
+            </div>
+        </div>
+
+        <!-- 右侧主内容 -->
+        <div class="main-content">
+            <!-- 当前交易编号显示 -->
+            <div style="margin-bottom: 16px; padding: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; text-align: center;">
+                <div style="font-size: 12px; color: rgba(255,255,255,0.8); margin-bottom: 4px;">当前交易编号</div>
+                <div id="currentTradeNumber" style="font-size: 36px; font-weight: 900; color: white;">-</div>
+            </div>
+
+            <!-- 余额显示 -->
+            <div style="text-align: right; margin-bottom: 20px; padding: 16px; background: #2b3139; border-radius: 12px;">
+                <div style="font-size: 12px; color: #848e9c; margin-bottom: 4px;">账户余额 (USDT)</div>
+                <div class="text-PrimaryText text-[12px] leading-[18px] font-[500]" id="accountBalance" style="font-size: 28px; font-weight: 700; color: #0ecb81;">1000.00</div>
+            </div>
+
+            <!-- 价格显示（保留选择器） -->
+            <div class="price-item">
+                <div style="font-size: 12px; color: #848e9c; margin-bottom: 4px;">最新价格</div>
+                <div class="flex-1 cursor-pointer">0.00120</div>
+            </div>
+
+            <!-- 交易表单 -->
+            <div style="background: #2b3139; border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                <form id="tradeForm">
+                    <div class="form-group">
+                        <label for="limitPrice">买入价格</label>
+                        <input type="text" id="limitPrice" placeholder="0.00000">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="limitTotal">买入数量</label>
+                        <input type="text" id="limitTotal" placeholder="0">
+                    </div>
+
+                    <div class="form-group">
+                        <label>卖出价格</label>
+                        <input type="text" id="limitTotal" placeholder="0.00000">
+                    </div>
+
+                    <!-- 反向订单复选框 -->
+                    <div class="checkbox-group">
+                        <input type="checkbox" id="reverseOrder" class="bn-checkbox bn-checkbox__square data-size-md" checked>
+                        <label for="reverseOrder">启用反向订单</label>
+                    </div>
+
+                    <!-- 买入按钮 -->
+                    <button type="button" class="bn-button bn-button__buy data-size-middle w-full" onclick="showConfirmModal()">
+                        买入 ALPHA
+                    </button>
+                </form>
+            </div>
+
+            <!-- 日志区域 -->
+            <div class="section">
+                <div class="section-title">📋 操作日志</div>
+                <div class="log-section" id="logContent">
+                    <div class="log-entry info">
+                        <span class="timestamp">[00:00:00]</span>
+                        等待插件操作...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认弹窗 -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h3>✅ 确认交易</h3>
+            <div class="modal-content">
+                <div class="modal-row">
+                    <span>买入价格</span>
+                    <span id="modalBuyPrice">-</span>
+                </div>
+                <div class="modal-row">
+                    <span>买入数量</span>
+                    <span id="modalAmount">-</span>
+                </div>
+                <div class="modal-row">
+                    <span>卖出价格</span>
+                    <span id="modalSellPrice">-</span>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="bn-button bn-button__primary data-size-middle w-full" onclick="confirmTrade()">
+                    确认
+                </button>
+                <button class="bn-button data-size-middle w-full" style="background: #2b3139; color: #eaecef;" onclick="closeModal()">
+                    取消
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== 全局状态 ==========
+        let tradeCounter = 0;
+        let successCount = 0;
+        let failCount = 0;
+        let initialBalanceSnapshot = 1000;
+        let totalFriction = 0;
+
+        // ========== 场景描述 ==========
+        const scenarioDescriptions = {
+            'normal': '每次交易固定扣除基础磨损金额，所有交易都会成功。',
+            'third-fail': '前2次正常，第3次扣除5 USDT，触发余额保护。',
+            'fifth-fail': '前4次正常，第5次扣除5 USDT，触发余额保护。',
+            'random-fail': '每次交易有15%概率扣除5 USDT，触发余额保护。',
+            'progressive': '磨损逐渐增大：0.1 → 0.5 → 1.0 → 2.0 → 5.0，测试渐进失败。',
+            'delay': '每次交易延迟1-3秒，模拟网络慢速场景。',
+            'unstable-balance': '余额显示会在1-2秒内波动，测试余额稳定性检测。'
+        };
+
+        // ========== 场景切换 ==========
+        document.getElementById('testScenario').addEventListener('change', (e) => {
+            const desc = scenarioDescriptions[e.target.value] || '未知场景';
+            document.getElementById('scenarioDescription').textContent = desc;
+            addLog(`📋 切换测试场景: ${e.target.options[e.target.selectedIndex].text}`, 'info');
+        });
+
+        // 初始化场景描述
+        document.getElementById('scenarioDescription').textContent = scenarioDescriptions['normal'];
+
+        // ========== 参数更新 ==========
+        document.getElementById('frictionAmount').addEventListener('input', (e) => {
+            document.getElementById('frictionDisplay').textContent = `${parseFloat(e.target.value).toFixed(2)} USDT`;
+        });
+
+        document.getElementById('responseDelay').addEventListener('input', (e) => {
+            document.getElementById('delayDisplay').textContent = `${e.target.value} ms`;
+        });
+
+        // ========== 日志功能 ==========
+        function addLog(message, type = 'info') {
+            const logContent = document.getElementById('logContent');
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.innerHTML = `<span class="timestamp">[${timestamp}]</span>${message}`;
+            logContent.appendChild(entry);
+            logContent.scrollTop = logContent.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('logContent').innerHTML = '<div class="log-entry info"><span class="timestamp">[--:--:--]</span>日志已清空</div>';
+            addLog('🚀 准备进行新的测试', 'info');
+        }
+
+        // ========== 更新队列状态 ==========
+        function updateQueueStatus(status, current, total) {
+            document.getElementById('queueStatus').textContent = status;
+            document.getElementById('queueProgress').textContent = `${current} / ${total}`;
+            document.getElementById('successCount').textContent = successCount;
+            document.getElementById('failCount').textContent = failCount;
+
+            const currentBalance = parseFloat(document.getElementById('accountBalance').textContent);
+            document.getElementById('currentBalance').textContent = `${currentBalance.toFixed(2)} USDT`;
+            document.getElementById('totalFriction').textContent = `${totalFriction.toFixed(2)} USDT`;
+        }
+
+        // ========== 显示确认弹窗 ==========
+        function showConfirmModal() {
+            tradeCounter++;
+
+            const scenario = document.getElementById('testScenario').value;
+            const buyPrice = document.querySelectorAll('#limitPrice')[0]?.value || '0.00120';
+            const amount = document.querySelectorAll('#limitTotal')[0]?.value || '10';
+            const sellPrice = document.querySelectorAll('#limitTotal')[1]?.value || '0.00118';
+
+            document.getElementById('modalBuyPrice').textContent = buyPrice + ' USDT';
+            document.getElementById('modalAmount').textContent = amount + ' USDT';
+            document.getElementById('modalSellPrice').textContent = sellPrice + ' USDT';
+
+            document.getElementById('modalOverlay').classList.add('show');
+
+            addLog(`📋 [弹窗] 第 ${tradeCounter} 次交易确认弹窗显示（场景: ${scenario}）`, 'info');
+            addLog(`🔍 [调试] tradeCounter 递增为: ${tradeCounter}`, 'info');
+            updateQueueStatus('运行中', tradeCounter - 1, tradeCounter);
+
+            // 更新显著的交易编号显示
+            document.getElementById('currentTradeNumber').textContent = `#${tradeCounter}`;
+        }
+
+        // ========== 关闭弹窗 ==========
+        function closeModal() {
+            document.getElementById('modalOverlay').classList.remove('show');
+            addLog('❌ 取消交易', 'error');
+        }
+
+        // ========== 余额稳定性模拟 ==========
+        async function simulateBalanceUpdate(targetBalance, unstable = false) {
+            const balanceEl = document.getElementById('accountBalance');
+
+            if (unstable) {
+                // 模拟余额在1-2秒内波动
+                const steps = 3;
+                const stepDelay = 400;
+
+                for (let i = 0; i < steps; i++) {
+                    const fluctuation = (Math.random() - 0.5) * 2;
+                    const tempBalance = targetBalance + fluctuation;
+                    balanceEl.textContent = tempBalance.toFixed(2);
+                    await new Promise(r => setTimeout(r, stepDelay));
+                }
+            }
+
+            // 最终稳定
+            balanceEl.textContent = targetBalance.toFixed(2);
+            balanceEl.classList.add('balance-decrease');
+            setTimeout(() => {
+                balanceEl.classList.remove('balance-decrease');
+            }, 600);
+        }
+
+        // ========== 确认交易（核心逻辑） ==========
+        async function confirmTrade() {
+            // ⚠️ 关键修复：记录当前交易编号用于判断
+            const currentTradeNumber = tradeCounter;
+
+            const scenario = document.getElementById('testScenario').value;
+            const baseFriction = parseFloat(document.getElementById('frictionAmount').value);
+            const responseDelay = parseInt(document.getElementById('responseDelay').value);
+            const failAtPosition = parseInt(document.getElementById('failAtPosition').value);
+            const unstableBalance = document.getElementById('unstableBalance').checked;
+
+            const balanceEl = document.getElementById('accountBalance');
+            const currentBalance = parseFloat(balanceEl.textContent);
+
+            addLog(`🔍 [调试] 当前交易编号: ${currentTradeNumber}, 场景: ${scenario}`, 'info');
+            addLog(`💼 交易前余额: ${currentBalance.toFixed(2)} USDT`, 'info');
+
+            // 模拟网络延迟
+            if (responseDelay > 0) {
+                addLog(`⏱️ 模拟网络延迟 ${responseDelay}ms...`, 'warning');
+                await new Promise(r => setTimeout(r, responseDelay));
+            }
+
+            // 根据场景计算磨损
+            let friction = baseFriction;
+            let shouldFail = false;
+
+            switch (scenario) {
+                case 'normal':
+                    friction = baseFriction;
+                    addLog(`✅ [场景] 正常模式，磨损: ${friction.toFixed(2)} USDT`, 'info');
+                    break;
+
+                case 'third-fail':
+                    if (currentTradeNumber === 3) {
+                        friction = 5.0;
+                        shouldFail = true;
+                        addLog(`❌ [场景] 第3次失败触发！磨损: ${friction.toFixed(2)} USDT`, 'warning');
+                    } else {
+                        addLog(`✅ [场景] 第${currentTradeNumber}次正常，磨损: ${friction.toFixed(2)} USDT`, 'info');
+                    }
+                    break;
+
+                case 'fifth-fail':
+                    if (currentTradeNumber === 5) {
+                        friction = 5.0;
+                        shouldFail = true;
+                        addLog(`❌ [场景] 第5次失败触发！磨损: ${friction.toFixed(2)} USDT`, 'warning');
+                    } else {
+                        addLog(`✅ [场景] 第${currentTradeNumber}次正常，磨损: ${friction.toFixed(2)} USDT`, 'info');
+                    }
+                    break;
+
+                case 'random-fail':
+                    if (Math.random() < 0.15) {
+                        friction = 5.0;
+                        shouldFail = true;
+                        addLog(`🎲 [场景] 随机失败触发！磨损: ${friction.toFixed(2)} USDT`, 'warning');
+                    } else {
+                        addLog(`✅ [场景] 随机成功，磨损: ${friction.toFixed(2)} USDT`, 'info');
+                    }
+                    break;
+
+                case 'progressive':
+                    const progressiveValues = [0.1, 0.5, 1.0, 2.0, 5.0];
+                    const index = Math.min(currentTradeNumber - 1, progressiveValues.length - 1);
+                    friction = progressiveValues[index];
+                    if (friction >= 5.0) shouldFail = true;
+                    addLog(`📈 [场景] 渐进失败，第${currentTradeNumber}次磨损: ${friction.toFixed(2)} USDT${shouldFail ? ' (触发)' : ''}`, shouldFail ? 'warning' : 'info');
+                    break;
+
+                case 'delay':
+                    const delayMs = 1000 + Math.random() * 2000;
+                    addLog(`⏱️ [场景] 网络延迟 ${delayMs.toFixed(0)}ms`, 'warning');
+                    await new Promise(r => setTimeout(r, delayMs));
+                    break;
+
+                case 'unstable-balance':
+                    addLog(`📊 [场景] 余额不稳定模拟`, 'info');
+                    // 在后续余额更新时处理
+                    break;
+            }
+
+            // 检查用户指定的失败位置
+            if (failAtPosition > 0 && currentTradeNumber === failAtPosition) {
+                friction = 5.0;
+                shouldFail = true;
+                addLog(`⚠️ [手动] 指定第 ${failAtPosition} 次失败触发！`, 'warning');
+            }
+
+            // 更新余额
+            const newBalance = currentBalance - friction;
+            totalFriction += friction;
+
+            // 模拟余额更新（根据是否启用不稳定模拟）
+            await simulateBalanceUpdate(
+                newBalance,
+                unstableBalance || scenario === 'unstable-balance'
+            );
+
+            // 记录结果
+            if (shouldFail) {
+                failCount++;
+                addLog(`❌ 第 ${currentTradeNumber} 次交易：余额异常变化 ${friction.toFixed(2)} USDT (超过容差)`, 'error');
+                addLog(`🛑 余额保护触发！应停止所有后续交易`, 'error');
+                addLog(`📊 [统计] 成功: ${successCount}, 失败: ${failCount}, 总计: ${currentTradeNumber}`, 'warning');
+                updateQueueStatus('已停止', currentTradeNumber, currentTradeNumber);
+            } else {
+                successCount++;
+                addLog(`✅ 第 ${currentTradeNumber} 次交易成功，磨损 ${friction.toFixed(2)} USDT`, 'success');
+                updateQueueStatus('运行中', currentTradeNumber, currentTradeNumber);
+            }
+
+            addLog(`💼 余额更新: ${currentBalance.toFixed(2)} → ${newBalance.toFixed(2)} USDT`, 'info');
+
+            closeModal();
+
+            // 清空表单
+            document.querySelectorAll('input[type="text"]').forEach(input => input.value = '');
+        }
+
+        // ========== 重置测试 ==========
+        function resetTest() {
+            tradeCounter = 0;
+            successCount = 0;
+            failCount = 0;
+            totalFriction = 0;
+            initialBalanceSnapshot = 1000;
+
+            document.getElementById('accountBalance').textContent = '1000.00';
+            document.getElementById('initialBalance').textContent = '1000.00 USDT';
+            document.getElementById('currentTradeNumber').textContent = '-';
+
+            updateQueueStatus('待机', 0, 0);
+
+            clearLog();
+            addLog('🔄 测试已重置', 'success');
+            addLog(`🔍 [调试] tradeCounter 已重置为: ${tradeCounter}`, 'info');
+        }
+
+        // ========== 页面加载 ==========
+        window.addEventListener('load', () => {
+            // 初始化复选框
+            const checkbox = document.getElementById('reverseOrder');
+            checkbox.setAttribute('aria-checked', 'true');
+
+            addLog('🚀 测试页面加载完成', 'success');
+            addLog('💡 提示：打开 Chrome 扩展，配置交易参数后开始测试', 'info');
+            addLog('📊 当前场景：正常模式（固定 0.1 USDT）', 'info');
+
+            updateQueueStatus('待机', 0, 0);
+        });
+
+        // 监听复选框变化
+        document.getElementById('reverseOrder').addEventListener('change', (e) => {
+            e.target.setAttribute('aria-checked', e.target.checked ? 'true' : 'false');
+            addLog(`${e.target.checked ? '✅' : '❌'} 反向订单: ${e.target.checked ? '已启用' : '已禁用'}`, e.target.checked ? 'success' : 'warning');
+        });
+    </script>
+</body>
+</html>

@@ -22,6 +22,18 @@ const SELECTORS = Object.freeze({
     balanceAmount: "div.text-PrimaryText.text-\\[12px\\].leading-\\[18px\\].font-\\[500\\]"
 });
 
+// 余额保护配置
+const TRADE_CONFIG = Object.freeze({
+    // 余额容差配置
+    tolerancePercent: 0.15,      // 交易金额的 15%
+    minTolerance: 0.5,           // 最小容差 0.5 USDT
+    maxTolerance: 1,             // 最大容差 3 USDT
+    // 余额检测配置
+    balanceCheckTimeout: 6000,   // 最多等待 6 秒
+    balanceCheckInterval: 500,   // 每 500ms 检查一次
+    balanceStableThreshold: 2    // 余额连续 2 次相同认为稳定
+});
+
 function getConfig() {
     const ovr = window.__DOM_HELPER_OVERRIDE__ || {};
     return Object.assign({}, window.CONFIG, ovr);
@@ -97,7 +109,99 @@ function readDisplayedBalance() {
     }
 }
 
-// 自动勾选反向订单
+// 动态计算余额容差
+function calculateTolerance(howMoney) {
+    const { tolerancePercent, minTolerance, maxTolerance } = TRADE_CONFIG;
+    const calculated = Number(howMoney) * tolerancePercent;
+    return Math.max(minTolerance, Math.min(calculated, maxTolerance));
+}
+
+// 等待余额稳定（反向订单执行完成）
+async function waitForBalanceStabilize(preBalance, timeoutMs = 8000) {
+    const startTime = Date.now();
+    const { balanceCheckInterval, balanceStableThreshold } = TRADE_CONFIG;
+
+    let lastBalance = null;
+    let stableCount = 0;
+
+    while (Date.now() - startTime < timeoutMs) {
+        const currentBalance = readDisplayedBalance();
+
+        if (Number.isFinite(currentBalance)) {
+            // 余额连续相同则认为已稳定
+            if (currentBalance === lastBalance) {
+                stableCount++;
+                if (stableCount >= balanceStableThreshold) {
+                    return {
+                        balance: currentBalance,
+                        delta: Math.abs(currentBalance - preBalance),
+                        stabilized: true
+                    };
+                }
+            } else {
+                stableCount = 0;
+            }
+            lastBalance = currentBalance;
+        }
+
+        await sleep(balanceCheckInterval);
+    }
+
+    // 超时：返回最后读取的余额
+    const finalBalance = Number.isFinite(lastBalance) ? lastBalance : preBalance;
+    return {
+        balance: finalBalance,
+        delta: Math.abs(finalBalance - preBalance),
+        stabilized: false
+    };
+}
+
+// 带余额保护的单次交易执行
+async function executeTradeWithGuard(buyAdd, sellAdd, howMoney) {
+    // 1. 记录交易前余额
+    const preBalance = readDisplayedBalance();
+    if (!Number.isFinite(preBalance)) {
+        throw new Error('无法读取账户余额，交易已取消');
+    }
+
+    console.log(`[余额保护] 交易前余额: ${preBalance.toFixed(4)} USDT`);
+
+    // 2. 执行买入 + 反向订单
+    await alphaBtnActionButtons(buyAdd, sellAdd, howMoney);
+
+    // 3. 等待余额稳定（等待反向订单执行）
+    const { balance: postBalance, delta, stabilized } = await waitForBalanceStabilize(
+        preBalance,
+        TRADE_CONFIG.balanceCheckTimeout
+    );
+
+    console.log(`[余额保护] 交易后余额: ${postBalance.toFixed(4)} USDT, 变化: ${delta.toFixed(4)} USDT${stabilized ? '' : ' (未稳定)'}`);
+
+    // 4. 计算容差并检查
+    const tolerance = calculateTolerance(howMoney);
+    console.log(`[余额保护] 容差阈值: ${tolerance.toFixed(4)} USDT (交易金额: ${howMoney} USDT)`);
+
+    if (delta > tolerance) {
+        const error = new Error(
+            `余额保护触发：余额变化 ${delta.toFixed(4)} USDT 超过容差 ${tolerance.toFixed(4)} USDT，` +
+            `推断反向订单未成交，交易已停止`
+        );
+        error.code = 'BALANCE_GUARD_TRIGGERED';
+        error.details = { preBalance, postBalance, delta, tolerance, howMoney };
+        throw error;
+    }
+
+    // 5. 交易成功
+    return {
+        preBalance,
+        postBalance,
+        delta,
+        tolerance,
+        stabilized
+    };
+}
+
+// 检查反向订单是否已勾选
 function isReverseOrderEnabled() {
     const checkbox = document.querySelector(SELECTORS.reverseOrderCheckbox);
     if (!checkbox) return false;
@@ -105,6 +209,54 @@ function isReverseOrderEnabled() {
     return checkbox.classList.contains("checked")
         || checkbox.getAttribute("aria-checked") === "true"
         || (input && input.checked === true);
+}
+
+// 自动勾选反向订单复选框
+function ensureReverseOrderCheckboxState(targetChecked = true) {
+    const checkbox = document.querySelector(SELECTORS.reverseOrderCheckbox);
+    if (!checkbox) {
+        console.warn('[自动勾选] 未找到反向订单复选框');
+        return false;
+    }
+
+    const desired = Boolean(targetChecked);
+
+    // 如果已经是目标状态，直接返回
+    if (isReverseOrderEnabled() === desired) {
+        console.log('[自动勾选] 反向订单复选框已是目标状态');
+        return true;
+    }
+
+    // 尝试通过点击切换状态
+    const input = checkbox.querySelector("input[type='checkbox']");
+    const clickable = (input && typeof input.click === "function") ? input : checkbox;
+
+    try {
+        console.log('[自动勾选] 尝试点击反向订单复选框');
+        clickable.click();
+    } catch (err) {
+        console.warn('[自动勾选] 点击失败，尝试直接设置属性', err);
+    }
+
+    // 检查点击是否成功
+    if (isReverseOrderEnabled() === desired) {
+        console.log('[自动勾选] 反向订单复选框已成功勾选');
+        return true;
+    }
+
+    // 如果点击失败，尝试直接设置属性
+    if (input) {
+        input.checked = desired;
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    checkbox.setAttribute("aria-checked", desired ? "true" : "false");
+    checkbox.classList.toggle("checked", desired);
+
+    const finalState = isReverseOrderEnabled() === desired;
+    console.log(`[自动勾选] 最终状态: ${finalState ? '成功' : '失败'}`);
+    return finalState;
 }
 
 // 初始化检测函数，确保页面元素存在，打开插件的时候执行
@@ -145,6 +297,8 @@ function runElementDiagnostics() {
         return false;
     }
 
+    const checkboxEnabled = ensureReverseOrderCheckboxState(true);
+
     const progressUpdate = { lastError: null };
 
     const shouldResetState =
@@ -156,10 +310,19 @@ function runElementDiagnostics() {
             status: "idle",
             total: 0,
             current: 0,
-            lastMessage: "初始化成功，已检测到交易页面核心元素。"
+            lastMessage: checkboxEnabled
+                ? "初始化成功，已检测到交易页面核心元素，反向订单已自动勾选。"
+                : "初始化成功，已检测到交易页面核心元素，但反向订单未能自动勾选，请手动确认。"
         });
     } else if (currentProgress.lastMessage === undefined || currentProgress.lastMessage === null) {
-        progressUpdate.lastMessage = "初始化成功，已检测到交易页面核心元素。";
+        progressUpdate.lastMessage = checkboxEnabled
+            ? "初始化成功，已检测到交易页面核心元素，反向订单已自动勾选。"
+            : "初始化成功，已检测到交易页面核心元素，但反向订单未能自动勾选，请手动确认。";
+    }
+
+    // 如果复选框未能成功勾选，添加警告
+    if (!checkboxEnabled) {
+        progressUpdate.lastError = "反向订单复选框未能自动勾选，请手动勾选后再开始交易。";
     }
 
     pushTradeProgress(progressUpdate);
@@ -293,12 +456,12 @@ async function alphaBtnActionButtons(buyAdd, sellAdd, howMoney) {
 window.isTradingPaused = false;
 window.currentTradeSession = null;
 
-//多次交易执行函数
+//多次交易执行函数（增强版：带余额保护）
 async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, tradeInterval) {
     tradeCount = parseInt(tradeCount) || 1;
     tradeInterval = parseInt(tradeInterval) || 5;
 
-    console.log(`开始执行 ${tradeCount} 次交易，间隔 ${tradeInterval} 秒`);
+    console.log(`开始执行 ${tradeCount} 次交易，间隔 ${tradeInterval} 秒（已启用余额保护）`);
 
     // 创建新的交易会话ID
     const sessionId = Date.now();
@@ -307,6 +470,7 @@ async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, trad
     const sessionStartBalance = readDisplayedBalance();
     const normalizedStartBalance = Number.isFinite(sessionStartBalance) ? sessionStartBalance : null;
 
+    // 检查反向订单是否勾选
     if (!isReverseOrderEnabled()) {
         const message = "检测到反向订单未勾选，交易已取消";
         window.currentTradeSession = null;
@@ -327,7 +491,7 @@ async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, trad
         total: tradeCount,
         current: 0,
         status: "running",
-        lastMessage: `准备执行 ${tradeCount} 次交易`,
+        lastMessage: `准备执行 ${tradeCount} 次交易（已启用余额保护）`,
         balanceBefore: normalizedStartBalance,
         balanceAfter: normalizedStartBalance,
         balanceChange: null
@@ -337,12 +501,20 @@ async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, trad
         // 检查是否被暂停或会话已更改
         if (window.isTradingPaused || window.currentTradeSession !== sessionId) {
             console.log('交易已被暂停或停止');
+            const currentBalance = readDisplayedBalance();
+            const finalBalance = Number.isFinite(currentBalance) ? currentBalance : normalizedStartBalance;
+            const balanceChange = (normalizedStartBalance != null && finalBalance != null)
+                ? normalizedStartBalance - finalBalance
+                : null;
+
             pushTradeProgress({
                 status: "paused",
                 total: tradeCount,
                 current: Math.max(0, i - 1),
                 lastMessage: `交易已暂停，已完成 ${Math.max(0, i - 1)} / ${tradeCount}`,
-                balanceBefore: normalizedStartBalance
+                balanceBefore: normalizedStartBalance,
+                balanceAfter: finalBalance,
+                balanceChange
             });
             return "交易已暂停";
         }
@@ -358,15 +530,19 @@ async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, trad
         });
 
         try {
-            await alphaBtnActionButtons(buyAdd, sellAdd, howMoney);
-            console.log(`第 ${i} 次交易完成`);
+            // ===== 核心改动：使用带余额保护的交易函数 =====
+            const result = await executeTradeWithGuard(buyAdd, sellAdd, howMoney);
+
+            console.log(`第 ${i} 次交易完成，余额变化 ${result.delta.toFixed(4)} USDT（容差 ${result.tolerance.toFixed(4)} USDT）`);
+
             pushTradeProgress({
                 status: "running",
                 total: tradeCount,
                 current: i,
-                lastMessage: `第 ${i} 次交易完成`,
+                lastMessage: `第 ${i} 次交易完成，余额变化 ${result.delta.toFixed(4)} USDT`,
                 lastError: null,
-                balanceBefore: normalizedStartBalance
+                balanceBefore: normalizedStartBalance,
+                balanceAfter: result.postBalance
             });
 
             // 如果不是最后一次交易，等待间隔时间
@@ -377,12 +553,20 @@ async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, trad
                 for (let waitTime = 0; waitTime < tradeInterval; waitTime++) {
                     if (window.isTradingPaused || window.currentTradeSession !== sessionId) {
                         console.log('等待期间交易被暂停');
+                        const currentBalance = readDisplayedBalance();
+                        const finalBalance = Number.isFinite(currentBalance) ? currentBalance : result.postBalance;
+                        const balanceChange = (normalizedStartBalance != null && finalBalance != null)
+                            ? normalizedStartBalance - finalBalance
+                            : null;
+
                         pushTradeProgress({
                             status: "paused",
                             total: tradeCount,
                             current: i,
                             lastMessage: "等待期间交易被暂停",
-                            balanceBefore: normalizedStartBalance
+                            balanceBefore: normalizedStartBalance,
+                            balanceAfter: finalBalance,
+                            balanceChange
                         });
                         return "交易已暂停";
                     }
@@ -391,15 +575,38 @@ async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, trad
             }
         } catch (error) {
             console.error(`第 ${i} 次交易失败:`, error);
+
+            // ===== 核心改动：区分余额保护触发和普通错误 =====
+            const isFatalError = error.code === 'BALANCE_GUARD_TRIGGERED'
+                || error.message.includes('未找到')
+                || error.message.includes('无法读取');
+
+            const currentBalance = readDisplayedBalance();
+            const finalBalance = Number.isFinite(currentBalance) ? currentBalance : normalizedStartBalance;
+            const balanceChange = (normalizedStartBalance != null && finalBalance != null)
+                ? normalizedStartBalance - finalBalance
+                : null;
+
             pushTradeProgress({
-                status: "running",
+                status: isFatalError ? "error" : "running",
                 total: tradeCount,
                 current: Math.max(0, i - 1),
                 lastMessage: `第 ${i} 次交易失败：${error?.message || error}`,
                 lastError: error?.message || String(error),
-                balanceBefore: normalizedStartBalance
+                balanceBefore: normalizedStartBalance,
+                balanceAfter: finalBalance,
+                balanceChange
             });
-            // 即使失败也继续执行下次交易
+
+            // 如果是致命错误（余额保护触发），立即停止所有交易
+            if (isFatalError) {
+                console.error('[致命错误] 交易已终止，不再执行后续交易');
+                window.currentTradeSession = null;
+                return error?.message || "交易失败";
+            }
+
+            // 非致命错误：等待后继续下一次交易
+            console.warn('[非致命错误] 继续执行下一次交易');
             if (i < tradeCount) {
                 await sleep(tradeInterval * 1000);
             }
@@ -407,8 +614,8 @@ async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, trad
     }
 
     console.log(`所有 ${tradeCount} 次交易执行完成`);
-    // 交易完成后重置状态
     window.currentTradeSession = null;
+
     const finalBalance = readDisplayedBalance();
     const normalizedFinalBalance = Number.isFinite(finalBalance) ? finalBalance : null;
     const balanceChange = (normalizedStartBalance != null && normalizedFinalBalance != null)
@@ -416,8 +623,9 @@ async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, trad
         : null;
     const formattedChange = formatAmount(balanceChange);
     const completionMessage = (balanceChange != null && formattedChange)
-        ? `所有 ${tradeCount} 次交易执行完成，费用估算（USDT）：${formattedChange}`
+        ? `所有 ${tradeCount} 次交易执行完成，总费用估算（USDT）：${formattedChange}`
         : `所有 ${tradeCount} 次交易执行完成`;
+
     pushTradeProgress({
         status: "completed",
         total: tradeCount,
@@ -428,6 +636,7 @@ async function executeMultipleTrades(buyAdd, sellAdd, howMoney, tradeCount, trad
         balanceAfter: normalizedFinalBalance,
         balanceChange
     });
+
     return "";
 }
 

@@ -36,7 +36,7 @@
       "matches": [
         "<all_urls>"
       ],
-      "js": [ "utils.js", "content.js" ],
+      "js": [ "utils.js", "tradeQueueController.js", "content.js" ],
       "run_at": "document_idle",
       "all_frames": false
     }
